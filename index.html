@@ -178,13 +178,15 @@
             font-size: 0.85rem;
         }
 
+        /* Perfectly Balanced Side-by-Side Audio Drawer Grid */
         .audio-drawer {
             display: none;
             grid-template-columns: 1fr 1fr;
-            gap: 12px 20px;
-            padding: 12px 18px;
+            gap: 12px 24px;
+            padding: 14px 18px;
             border-top: 1px solid rgba(255, 255, 255, 0.3);
             font-size: 0.75rem;
+            align-items: center;
         }
 
         .audio-drawer.open {
@@ -198,6 +200,7 @@
             cursor: pointer;
             user-select: none;
             font-weight: bold;
+            height: 24px;
         }
 
         .checkbox-group input[type="checkbox"] {
@@ -212,6 +215,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 10px;
+            height: 24px;
         }
 
         input[type="range"] {
@@ -438,7 +442,9 @@
             <button class="toggle-btn" onclick="toggleAudioDrawer()">▼</button>
         </div>
 
+        <!-- Perfectly Aligned 2-Column Audio Drawer -->
         <div class="audio-drawer" id="audio-drawer">
+            <!-- Row 1: Checkboxes -->
             <label class="checkbox-group">
                 <input type="checkbox" id="single-tone-mode">
                 <span>SINGLE TONE MODE</span>
@@ -447,10 +453,15 @@
                 <input type="checkbox" id="vary-scale-repeat" checked>
                 <span>VARY REPEAT SCALE</span>
             </label>
+
+            <!-- Row 2: Checkbox + Spacer -->
             <label class="checkbox-group">
                 <input type="checkbox" id="mute-wasd-tones">
                 <span>MUTE WASD TONES</span>
             </label>
+            <div></div>
+
+            <!-- Row 3: Speed of Scale | Scale Length -->
             <div class="slider-group">
                 <span>SPEED OF SCALE:</span>
                 <input type="range" id="scale-speed" min="0.05" max="1.0" step="0.05" value="0.20">
@@ -459,6 +470,8 @@
                 <span>SCALE LENGTH:</span>
                 <input type="range" id="scale-length" min="3" max="12" step="1" value="8" onchange="updateScaleLengthUI()">
             </div>
+
+            <!-- Row 4: Pitch Shift | Glide Speed -->
             <div class="slider-group">
                 <span>PITCH SHIFT:</span>
                 <input type="range" id="master-pitch-shift" min="-2400" max="1200" step="100" value="-2400" onchange="updateMasterPitch()">
@@ -467,6 +480,8 @@
                 <span>GLIDE SPEED:</span>
                 <input type="range" id="glide-speed" min="0.01" max="0.5" step="0.01" value="0.01">
             </div>
+
+            <!-- Row 5: Filter Cutoff | Master Vol -->
             <div class="slider-group">
                 <span>FILTER CUTOFF:</span>
                 <input type="range" id="filter-cutoff" min="200" max="8000" step="100" value="3000" onchange="updateFilter()">
@@ -475,6 +490,8 @@
                 <span>MASTER VOL:</span>
                 <input type="range" id="master-vol" min="0.01" max="0.3" step="0.01" value="0.08" onchange="updateCamToneVol()">
             </div>
+
+            <!-- Row 6: Harmonic Detune | Reverb Reflect -->
             <div class="slider-group">
                 <span>HARMONIC DETUNE:</span>
                 <input type="range" id="detune-val" min="0" max="25" step="1" value="5" onchange="updateDetune()">
@@ -562,7 +579,7 @@ let crosshairY = 120;
 const STEP_SPEED = 3;
 
 const customNoteOverrides = {};
-const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
+const huePitchOffsets = { 0:24, 1:21, 2:19, 3:0, 4:0, 5:0, 6:0, 7:0 };
 
 const NOTE_FREQS = {
     "C2": 65.41,  "C#2": 69.30,  "D2": 73.42,  "D#2": 77.78,  "E2": 82.41,  "F2": 87.31,  "F#2": 92.50,  "G2": 98.00,  "G#2": 103.83, "A2": 110.00, "A#2": 116.54, "B2": 123.47,
@@ -1154,7 +1171,6 @@ function processCameraTone(r, g, b) {
 }
 
 function startTone(key) {
-    // Check if WASD tones are muted
     const isMuted = document.getElementById("mute-wasd-tones").checked;
     if (isMuted) return;
 
