@@ -16,7 +16,7 @@
             justify-content: center;
             min-height: 90vh;
             margin: 0;
-            gap: 35px;
+            gap: 25px;
             transition: background-color 0.2s ease;
         }
 
@@ -24,7 +24,6 @@
             display: flex;
             align-items: center;
             gap: 18px;
-            margin-bottom: 15px;
         }
 
         button {
@@ -51,12 +50,94 @@
             display: inline-block;
         }
 
+        /* Developer Inspection Panel */
+        .dev-cam-panel {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid #fff;
+            padding: 12px 18px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
+        }
+
+        .dev-cam-panel.active {
+            display: flex;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            font-size: 0.8rem;
+            font-weight: bold;
+            gap: 12px;
+        }
+
+        .dev-content {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .dev-content.open {
+            display: flex;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 320px;
+            height: 240px;
+            border: 1px solid #fff;
+            overflow: hidden;
+        }
+
+        #dev-canvas {
+            width: 320px;
+            height: 240px;
+            display: block;
+        }
+
+        /* Crosshair lines */
+        .crosshair-h, .crosshair-v {
+            position: absolute;
+            background: #fff;
+            pointer-events: none;
+            mix-blend-mode: difference;
+        }
+
+        .crosshair-h {
+            height: 1px;
+            width: 100%;
+            top: 50%;
+            left: 0;
+        }
+
+        .crosshair-v {
+            width: 1px;
+            height: 100%;
+            left: 50%;
+            top: 0;
+        }
+
+        .file-label {
+            background: #fff;
+            color: #000;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
         .dpad {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 10px;
-            margin-bottom: 15px;
         }
 
         .row {
@@ -64,7 +145,6 @@
             gap: 10px;
         }
 
-        /* Transparent Key Buttons */
         .dir-btn {
             width: 66px;
             height: 66px;
@@ -84,7 +164,6 @@
             color: #000;
         }
 
-        /* Transparent Synth Control Bar */
         .synth-bar {
             display: flex;
             align-items: center;
@@ -94,7 +173,6 @@
             font-size: 0.85rem;
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
-            margin-bottom: 10px;
         }
 
         select {
@@ -106,7 +184,6 @@
             text-transform: uppercase;
         }
 
-        /* Transparent Camera Bar */
         .scale-display {
             display: flex;
             align-items: center;
@@ -146,7 +223,6 @@
             color: #aaa;
         }
 
-        /* Transparent Drawer Container */
         .expandable-container {
             display: none;
             flex-direction: column;
@@ -215,6 +291,26 @@
         <span id="dev-badge">DEV MODE: ACTIVE</span>
     </div>
 
+    <!-- Collapsible Developer Inspector Panel -->
+    <div class="dev-cam-panel" id="dev-cam-panel">
+        <div class="panel-header">
+            <span>TEST</span>
+            <button class="toggle-btn" onclick="toggleWebcamDrawer()">▼</button>
+        </div>
+        <div class="dev-content" id="dev-drawer">
+            <div class="canvas-container" id="canvas-wrap">
+                <canvas id="dev-canvas" width="320" height="240"></canvas>
+                <div class="crosshair-h" id="cross-h"></div>
+                <div class="crosshair-v" id="cross-v"></div>
+            </div>
+            <label class="file-label">
+                UPLOAD IMAGE
+                <input type="file" id="img-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
+            </label>
+            <video id="dev-video" autoplay playsinline style="display:none;"></video>
+        </div>
+    </div>
+
     <div class="dpad">
         <div class="row">
             <button id="w" class="dir-btn">W</button>
@@ -275,7 +371,7 @@
 
 <script>
 let port, writer, reader;
-const keys = {};
+const activeKeys = { w: false, a: false, s: false, d: false };
 
 let audioCtx = null;
 const activeNotes = {};
@@ -283,6 +379,13 @@ const activeNotes = {};
 let camOsc = null;
 let camGain = null;
 let devMode = false;
+let webcamActive = false;
+let uploadedImage = null;
+let devStream = null;
+
+let crosshairX = 160;
+let crosshairY = 120;
+const STEP_SPEED = 3;
 
 const WASD_SCALES = {
     minor:    { W: { freq: 440.00, note: "A4" }, A: { freq: 523.25, note: "C5" }, S: { freq: 587.33, note: "D5" }, D: { freq: 659.25, note: "E5" } },
@@ -347,14 +450,119 @@ const HUE_BASE_COLORS = [
 ];
 
 function toggleSpectrum() {
-    const drawer = document.getElementById("spectrum-drawer");
-    drawer.classList.toggle("open");
+    document.getElementById("spectrum-drawer").classList.toggle("open");
 }
 
 function devSelectColor(r, g, b) {
     if (!devMode) return;
     document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
     processCameraTone(r, g, b);
+}
+
+function toggleDevMode() {
+    devMode = !devMode;
+    document.getElementById("dev-badge").classList.toggle("active", devMode);
+    document.getElementById("dev-cam-panel").classList.toggle("active", devMode);
+    
+    if (!devMode && devStream) {
+        stopWebcam();
+        document.getElementById("dev-drawer").classList.remove("open");
+    }
+}
+
+async function toggleWebcamDrawer() {
+    const drawer = document.getElementById("dev-drawer");
+    drawer.classList.toggle("open");
+    webcamActive = drawer.classList.contains("open");
+
+    if (webcamActive && !uploadedImage) {
+        try {
+            devStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+            const video = document.getElementById("dev-video");
+            video.srcObject = devStream;
+            video.play();
+            updateCrosshairVisuals();
+        } catch (err) {
+            console.error("Webcam Access Error:", err);
+        }
+    } else if (!webcamActive) {
+        stopWebcam();
+    }
+}
+
+function stopWebcam() {
+    if (devStream) {
+        devStream.getTracks().forEach(track => track.stop());
+        devStream = null;
+    }
+}
+
+function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    stopWebcam();
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+            uploadedImage = img;
+            renderDevCanvas();
+        };
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function continuousUpdateLoop() {
+    let moved = false;
+
+    if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); moved = true; }
+    if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); moved = true; }
+    if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); moved = true; }
+    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); moved = true; }
+
+    if (devMode && webcamActive) {
+        renderDevCanvas();
+        if (moved) updateCrosshairVisuals();
+    }
+
+    requestAnimationFrame(continuousUpdateLoop);
+}
+
+function renderDevCanvas() {
+    const canvas = document.getElementById("dev-canvas");
+    const ctx = canvas.getContext("2d");
+
+    if (uploadedImage) {
+        ctx.drawImage(uploadedImage, 0, 0, 320, 240);
+        sampleCanvasAt(Math.floor(crosshairX), Math.floor(crosshairY));
+    } else {
+        const video = document.getElementById("dev-video");
+        if (video.readyState === 4) {
+            ctx.drawImage(video, 0, 0, 320, 240);
+            sampleCanvasAt(Math.floor(crosshairX), Math.floor(crosshairY));
+        }
+    }
+}
+
+function updateCrosshairVisuals() {
+    document.getElementById("cross-h").style.top = `${crosshairY}px`;
+    document.getElementById("cross-v").style.left = `${crosshairX}px`;
+}
+
+function sampleCanvasAt(x, y) {
+    const canvas = document.getElementById("dev-canvas");
+    const ctx = canvas.getContext("2d");
+    try {
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        const r = pixel[0];
+        const g = pixel[1];
+        const b = pixel[2];
+
+        document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        processCameraTone(r, g, b);
+    } catch (e) {}
 }
 
 function buildMatrixUI() {
@@ -574,35 +782,39 @@ function deactivate(key) {
 
 document.addEventListener("keydown", async (e) => {
     if (e.ctrlKey && e.altKey && e.shiftKey && e.key.toLowerCase() === 'd') {
-        devMode = !devMode;
-        document.getElementById("dev-badge").classList.toggle("active", devMode);
+        toggleDevMode();
         return;
     }
 
     const key = e.key.toLowerCase();
-    if (!["w","a","s","d"].includes(key) || keys[key]) return;
-    keys[key] = true;
-    activate(key);
-    await send(key.toUpperCase() + "1");
+    if (!["w","a","s","d"].includes(key)) return;
+    
+    if (!activeKeys[key]) {
+        activeKeys[key] = true;
+        activate(key);
+        await send(key.toUpperCase() + "1");
+    }
 });
 
 document.addEventListener("keyup", async (e) => {
     const key = e.key.toLowerCase();
     if (!["w","a","s","d"].includes(key)) return;
-    keys[key] = false;
+    
+    activeKeys[key] = false;
     deactivate(key);
     await send(key.toUpperCase() + "0");
 });
 
 ["w","a","s","d"].forEach(id => {
     const btn = document.getElementById(id);
-    btn.addEventListener("mousedown", async () => { activate(id); await send(id.toUpperCase() + "1"); });
-    btn.addEventListener("mouseup", async () => { deactivate(id); await send(id.toUpperCase() + "0"); });
-    btn.addEventListener("mouseleave", async () => { deactivate(id); await send(id.toUpperCase() + "0"); });
+    btn.addEventListener("mousedown", async () => { activeKeys[id] = true; activate(id); await send(id.toUpperCase() + "1"); });
+    btn.addEventListener("mouseup", async () => { activeKeys[id] = false; deactivate(id); await send(id.toUpperCase() + "0"); });
+    btn.addEventListener("mouseleave", async () => { activeKeys[id] = false; deactivate(id); await send(id.toUpperCase() + "0"); });
 });
 
 buildMatrixUI();
 updateScaleLabels();
+requestAnimationFrame(continuousUpdateLoop);
 </script>
 
 </body>
