@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>XY PLOTTER //</title>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            padding: 24px;
+            text-transform: uppercase;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh;
+            margin: 0;
+            gap: 35px; /* Spaced out sections vertically */
+            transition: background-color 0.2s ease;
+        }
+
+        .controls-top {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 15px; /* Spaced away from WASD */
+        }
+
+        button {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 8px 20px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .dpad {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px; /* Spaced away from Audio box */
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .dir-btn {
+            width: 66px;
+            height: 66px;
+            background: #000;
+            color: #fff;
+            border: 1px solid #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .dir-btn.active {
+            background: #fff;
+            color: #000;
+        }
+
+        .synth-bar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border: 1px solid #fff;
+            padding: 10px 18px;
+            font-size: 0.85rem;
+            background: rgba(0, 0, 0, 0.75);
+            margin-bottom: 10px;
+        }
+
+        select {
+            background: #000;
+            color: #fff;
+            border: 1px solid #fff;
+            font-family: inherit;
+            padding: 4px;
+            text-transform: uppercase;
+        }
+
+        /* Top Camera Color Display Box (Replaced WASD Colors) */
+        .scale-display {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border: 1px solid #fff;
+            padding: 10px 18px;
+            background: rgba(0, 0, 0, 0.75);
+        }
+
+        .note-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        /* Desaturated Muted Swatches */
+        .color-indicator {
+            width: 14px;
+            height: 14px;
+            border: 1px solid #fff;
+        }
+
+        /* Pure Arrow Toggle Button */
+        .toggle-btn {
+            background: transparent;
+            color: #fff;
+            border: none;
+            padding: 0 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-left: 6px;
+        }
+
+        .toggle-btn:hover {
+            color: #aaa;
+        }
+
+        /* Expandable Camera Spectrum Container */
+        .expandable-container {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            border: 1px solid #fff;
+            padding: 12px 18px;
+            background: rgba(0, 0, 0, 0.85);
+            margin-top: -15px;
+        }
+
+        .expandable-container.open {
+            display: flex;
+        }
+
+        .grid-header {
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        .stacks-container {
+            display: flex;
+            gap: 14px;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .hue-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .color-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.65rem;
+            font-weight: bold;
+        }
+
+        /* White Borders Restored on Swatches */
+        .color-square {
+            width: 14px;
+            height: 14px;
+            border: 1px solid #fff;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .color-square.active-shade {
+            transform: scale(1.4);
+            box-shadow: 0 0 8px #fff;
+            background-color: #fff !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls-top">
+        <button id="connect-btn" onclick="connect()">CONNECT USB</button>
+        <span id="status">STATUS: DISCONNECTED</span>
+    </div>
+
+    <div class="dpad">
+        <div class="row">
+            <button id="w" class="dir-btn">W</button>
+        </div>
+        <div class="row">
+            <button id="a" class="dir-btn">A</button>
+            <button id="s" class="dir-btn">S</button>
+            <button id="d" class="dir-btn">D</button>
+        </div>
+    </div>
+
+    <!-- Audio & Scale Controls -->
+    <div class="synth-bar">
+        <span>AUDIO:</span>
+        <select id="wave-type" onchange="updateWaveform()">
+            <option value="sine">SINE</option>
+            <option value="square" selected>SQUARE</option>
+            <option value="sawtooth">SAW</option>
+            <option value="triangle">TRI</option>
+        </select>
+
+        <span>SCALE:</span>
+        <select id="scale-type" onchange="updateScaleLabels()">
+            <option value="minor">MINOR PENTA (A)</option>
+            <option value="major">MAJOR PENTA (C)</option>
+            <option value="egyptian">EGYPTIAN</option>
+            <option value="blues">BLUES PENTA</option>
+        </select>
+    </div>
+
+    <!-- Top Primary Camera Colors Bar (Replaced WASD) -->
+    <div class="scale-display">
+        <div class="note-card">
+            <div class="color-indicator" style="background:#d63651;"></div>
+            <span>R: <span id="top-label-0">A2</span></span>
+        </div>
+        <div class="note-card">
+            <div class="color-indicator" style="background:#d6b636;"></div>
+            <span>Y: <span id="top-label-1">A3</span></span>
+        </div>
+        <div class="note-card">
+            <div class="color-indicator" style="background:#36d65b;"></div>
+            <span>G: <span id="top-label-2">A4</span></span>
+        </div>
+        <div class="note-card">
+            <div class="color-indicator" style="background:#36d6d6;"></div>
+            <span>C: <span id="top-label-3">A5</span></span>
+        </div>
+        <div class="note-card">
+            <div class="color-indicator" style="background:#365bd6;"></div>
+            <span>B: <span id="top-label-4">D5</span></span>
+        </div>
+        <button class="toggle-btn" onclick="toggleSpectrum()">▼</button>
+    </div>
+
+    <!-- Expandable Drawer with White Borders -->
+    <div class="expandable-container" id="spectrum-drawer">
+        <div class="grid-header">COLOUR TO SOUND</div>
+        <div class="stacks-container" id="main-color-stacks"></div>
+    </div>
+
+<script>
+let port, writer, reader;
+const keys = {};
+
+let audioCtx = null;
+const activeNotes = {};
+
+let camOsc = null;
+let camGain = null;
+
+// WASD Directional Pentatonic Notes
+const WASD_SCALES = {
+    minor:    { W: { freq: 440.00, note: "A4" }, A: { freq: 523.25, note: "C5" }, S: { freq: 587.33, note: "D5" }, D: { freq: 659.25, note: "E5" } },
+    major:    { W: { freq: 261.63, note: "C4" }, A: { freq: 293.66, note: "D4" }, S: { freq: 329.63, note: "E4" }, D: { freq: 392.00, note: "G4" } },
+    egyptian: { W: { freq: 293.66, note: "D4" }, A: { freq: 329.63, note: "E4" }, S: { freq: 392.00, note: "G4" }, D: { freq: 440.00, note: "A4" } },
+    blues:    { W: { freq: 220.00, note: "A3" }, A: { freq: 261.63, note: "C4" }, S: { freq: 293.66, note: "D4" }, D: { freq: 311.13, note: "D#4" } }
+};
+
+// 40-Note Expanded Multi-Hue Matrix
+const MATRIX_SCALES = {
+    minor: [
+        [{freq:110.00,note:"A2"}, {freq:130.81,note:"C3"}, {freq:146.83,note:"D3"}, {freq:164.81,note:"E3"}, {freq:196.00,note:"G3"}],
+        [{freq:174.61,note:"F3"}, {freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}],
+        [{freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}],
+        [{freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}],
+        [{freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}],
+        [{freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}],
+        [{freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}],
+        [{freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}]
+    ],
+    major: [
+        [{freq:130.81,note:"C3"}, {freq:146.83,note:"D3"}, {freq:164.81,note:"E3"}, {freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}],
+        [{freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}],
+        [{freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}],
+        [{freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}],
+        [{freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}],
+        [{freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}],
+        [{freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}],
+        [{freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}, {freq:2637.0,note:"E7"}]
+    ],
+    egyptian: [
+        [{freq:146.83,note:"D3"}, {freq:164.81,note:"E3"}, {freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}],
+        [{freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}],
+        [{freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}],
+        [{freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}],
+        [{freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}],
+        [{freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}],
+        [{freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}],
+        [{freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}, {freq:2637.0,note:"E7"}, {freq:3135.9,note:"G7"}]
+    ],
+    blues: [
+        [{freq:110.00,note:"A2"}, {freq:130.81,note:"C3"}, {freq:146.83,note:"D3"}, {freq:155.56,note:"D#3"},{freq:196.00,note:"G3"}],
+        [{freq:155.56,note:"D#3"},{freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}],
+        [{freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:311.13,note:"D#4"},{freq:392.00,note:"G4"}],
+        [{freq:311.13,note:"D#4"},{freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}],
+        [{freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:622.25,note:"D#5"},{freq:783.99,note:"G5"}],
+        [{freq:622.25,note:"D#5"},{freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}],
+        [{freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1244.5,note:"D#6"},{freq:1567.9,note:"G6"}],
+        [{freq:1244.5,note:"D#6"},{freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}]
+    ]
+};
+
+const HUE_CODES = ["R", "O", "Y", "G", "C", "B", "P", "M"];
+// Slightly Desaturated Muted Base Colors
+const HUE_BASE_COLORS = [
+    [214, 54, 81],    // Red
+    [214, 124, 54],   // Orange
+    [214, 182, 54],   // Yellow
+    [54, 214, 91],    // Green
+    [54, 214, 214],   // Cyan
+    [54, 91, 214],    // Blue
+    [142, 54, 214],   // Purple
+    [214, 54, 182]    // Magenta
+];
+
+function toggleSpectrum() {
+    const drawer = document.getElementById("spectrum-drawer");
+    drawer.classList.toggle("open");
+}
+
+function buildMatrixUI() {
+    const container = document.getElementById("main-color-stacks");
+    container.innerHTML = "";
+    
+    for (let h = 0; h < 8; h++) {
+        const stack = document.createElement("div");
+        stack.className = "hue-stack";
+
+        for (let s = 4; s >= 0; s--) {
+            const factor = 0.55 + (s * 0.11);
+            const r = Math.round(HUE_BASE_COLORS[h][0] * factor);
+            const g = Math.round(HUE_BASE_COLORS[h][1] * factor);
+            const b = Math.round(HUE_BASE_COLORS[h][2] * factor);
+
+            const item = document.createElement("div");
+            item.className = "color-item";
+
+            const sq = document.createElement("div");
+            sq.className = "color-square";
+            sq.id = `sq-${h}-${s}`;
+            sq.style.backgroundColor = `rgb(${r},${g},${b})`;
+
+            const label = document.createElement("span");
+            label.id = `label-${h}-${s}`;
+            label.innerText = `${HUE_CODES[h]}${s+1}:--`;
+
+            item.appendChild(sq);
+            item.appendChild(label);
+            stack.appendChild(item);
+        }
+        container.appendChild(stack);
+    }
+}
+
+function updateScaleLabels() {
+    const scale = document.getElementById("scale-type").value;
+    const matrix = MATRIX_SCALES[scale];
+    
+    // Update Top Row Primary Notes (Red, Yellow, Green, Cyan, Blue)
+    document.getElementById("top-label-0").innerText = matrix[0][0].note;
+    document.getElementById("top-label-1").innerText = matrix[2][0].note;
+    document.getElementById("top-label-2").innerText = matrix[3][0].note;
+    document.getElementById("top-label-3").innerText = matrix[4][0].note;
+    document.getElementById("top-label-4").innerText = matrix[5][0].note;
+
+    // Update Drawer Labels
+    for (let h = 0; h < 8; h++) {
+        for (let s = 0; s < 5; s++) {
+            const label = document.getElementById(`label-${h}-${s}`);
+            if (label) label.innerText = `${HUE_CODES[h]}${s+1}:${matrix[h][s].note}`;
+        }
+    }
+}
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        camOsc = audioCtx.createOscillator();
+        camGain = audioCtx.createGain();
+
+        camOsc.type = document.getElementById("wave-type").value;
+        camOsc.frequency.setValueAtTime(220, audioCtx.currentTime);
+
+        camGain.gain.setValueAtTime(0.08, audioCtx.currentTime); 
+
+        camOsc.connect(camGain);
+        camGain.connect(audioCtx.destination);
+        camOsc.start();
+    }
+}
+
+function updateWaveform() {
+    const wave = document.getElementById("wave-type").value;
+    if (camOsc) {
+        camOsc.type = wave;
+    }
+}
+
+function processCameraTone(r, g, b) {
+    initAudio();
+    if (!camOsc || !camGain) return;
+
+    let hueIndex = 0;
+    if (r > 180 && g < 80 && b < 80) hueIndex = 0;
+    else if (r > 180 && g >= 80 && g < 180 && b < 100) hueIndex = 1;
+    else if (r > 150 && g > 150 && b < 100) hueIndex = 2;
+    else if (g > r && g > b) hueIndex = 3;
+    else if (g > 100 && b > 100 && r < 100) hueIndex = 4;
+    else if (b > r && b > g && r < 100) hueIndex = 5;
+    else if (r > 100 && b > 150 && g < 100) hueIndex = 6;
+    else hueIndex = 7;
+
+    const brightness = (r + g + b) / 3;
+    const shadeIndex = Math.max(0, Math.min(4, Math.floor((brightness / 255) * 5)));
+
+    document.querySelectorAll('.color-square').forEach(el => el.classList.remove('active-shade'));
+    const activeSq = document.getElementById(`sq-${hueIndex}-${shadeIndex}`);
+    if (activeSq) activeSq.classList.add('active-shade');
+
+    const scaleKey = document.getElementById("scale-type").value;
+    const targetNote = MATRIX_SCALES[scaleKey][hueIndex][shadeIndex];
+
+    camOsc.frequency.setTargetAtTime(targetNote.freq, audioCtx.currentTime, 0.05);
+}
+
+function startTone(key) {
+    initAudio();
+    if (activeNotes[key]) return;
+
+    const scale = document.getElementById("scale-type").value;
+    const wave = document.getElementById("wave-type").value;
+    const noteData = WASD_SCALES[scale][key.toUpperCase()];
+
+    if (!noteData) return;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = wave;
+    osc.frequency.setValueAtTime(noteData.freq, audioCtx.currentTime);
+
+    gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15, audioCtx.currentTime + 0.02);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+
+    activeNotes[key] = { osc, gain };
+}
+
+function stopTone(key) {
+    if (activeNotes[key]) {
+        const { osc, gain } = activeNotes[key];
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        setTimeout(() => {
+            try { osc.stop(); } catch(e){}
+        }, 50);
+        delete activeNotes[key];
+    }
+}
+
+async function connect() {
+    try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        const encoder = new TextEncoderStream();
+        encoder.readable.pipeTo(port.writable);
+        writer = encoder.writable.getWriter();
+
+        document.getElementById("status").innerText = "STATUS: CONNECTED";
+        document.getElementById("connect-btn").style.display = "none";
+
+        listenToSerial();
+
+    } catch (err) {
+        document.getElementById("status").innerText = "STATUS: FAILED";
+    }
+}
+
+async function listenToSerial() {
+    const textDecoder = new TextDecoderStream();
+    port.readable.pipeTo(textDecoder.writable);
+    reader = textDecoder.readable.getReader();
+
+    let buffer = "";
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        buffer += value;
+        let lines = buffer.split("\n");
+        buffer = lines.pop();
+
+        for (let line of lines) {
+            line = line.trim();
+            if (line.startsWith("RGB:")) {
+                const parts = line.replace("RGB:", "").split(",");
+                if (parts.length === 3) {
+                    const r = parseInt(parts[0]);
+                    const g = parseInt(parts[1]);
+                    const b = parseInt(parts[2]);
+
+                    document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                    processCameraTone(r, g, b);
+                }
+            }
+        }
+    }
+}
+
+async function send(text) {
+    if (writer) await writer.write(text);
+}
+
+function activate(key) {
+    const btn = document.getElementById(key);
+    if (btn) btn.classList.add("active");
+    startTone(key);
+}
+
+function deactivate(key) {
+    const btn = document.getElementById(key);
+    if (btn) btn.classList.remove("active");
+    stopTone(key);
+}
+
+document.addEventListener("keydown", async (e) => {
+    const key = e.key.toLowerCase();
+    if (!["w","a","s","d"].includes(key) || keys[key]) return;
+    keys[key] = true;
+    activate(key);
+    await send(key.toUpperCase() + "1");
+});
+
+document.addEventListener("keyup", async (e) => {
+    const key = e.key.toLowerCase();
+    if (!["w","a","s","d"].includes(key)) return;
+    keys[key] = false;
+    deactivate(key);
+    await send(key.toUpperCase() + "0");
+});
+
+["w","a","s","d"].forEach(id => {
+    const btn = document.getElementById(id);
+    btn.addEventListener("mousedown", async () => { activate(id); await send(id.toUpperCase() + "1"); });
+    btn.addEventListener("mouseup", async () => { deactivate(id); await send(id.toUpperCase() + "0"); });
+    btn.addEventListener("mouseleave", async () => { deactivate(id); await send(id.toUpperCase() + "0"); });
+});
+
+buildMatrixUI();
+updateScaleLabels();
+</script>
+
+</body>
+</html>
