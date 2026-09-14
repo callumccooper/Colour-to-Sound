@@ -50,7 +50,6 @@
             display: inline-block;
         }
 
-        /* Developer Inspection Panel */
         .dev-cam-panel {
             display: none;
             flex-direction: column;
@@ -102,7 +101,6 @@
             display: block;
         }
 
-        /* Crosshair lines */
         .crosshair-h, .crosshair-v {
             position: absolute;
             background: #fff;
@@ -164,15 +162,45 @@
             color: #000;
         }
 
+        .synth-bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #fff;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
+        }
+
         .synth-bar {
             display: flex;
             align-items: center;
             gap: 15px;
-            border: 1px solid #fff;
             padding: 10px 18px;
             font-size: 0.85rem;
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(6px);
+        }
+
+        .audio-drawer {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 20px;
+            padding: 12px 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            font-size: 0.75rem;
+        }
+
+        .audio-drawer.open {
+            display: grid;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            accent-color: #fff;
+            cursor: pointer;
         }
 
         select {
@@ -291,7 +319,6 @@
         <span id="dev-badge">DEV MODE: ACTIVE</span>
     </div>
 
-    <!-- Collapsible Developer Inspector Panel -->
     <div class="dev-cam-panel" id="dev-cam-panel">
         <div class="panel-header">
             <span>TEST</span>
@@ -322,22 +349,44 @@
         </div>
     </div>
 
-    <div class="synth-bar">
-        <span>AUDIO:</span>
-        <select id="wave-type" onchange="updateWaveform()">
-            <option value="sine">SINE</option>
-            <option value="square" selected>SQUARE</option>
-            <option value="sawtooth">SAW</option>
-            <option value="triangle">TRI</option>
-        </select>
+    <div class="synth-bar-wrapper">
+        <div class="synth-bar">
+            <span>AUDIO:</span>
+            <select id="wave-type" onchange="updateWaveform()">
+                <option value="sine" selected>SINE</option>
+                <option value="square">SQUARE</option>
+                <option value="sawtooth">SAW</option>
+                <option value="triangle">TRI</option>
+            </select>
 
-        <span>SCALE:</span>
-        <select id="scale-type" onchange="updateScaleLabels()">
-            <option value="minor">MINOR PENTA (A)</option>
-            <option value="major">MAJOR PENTA (C)</option>
-            <option value="egyptian">EGYPTIAN</option>
-            <option value="blues">BLUES PENTA</option>
-        </select>
+            <span>SCALE:</span>
+            <select id="scale-type" onchange="updateScaleLabels()">
+                <option value="minor">MINOR PENTA (A)</option>
+                <option value="major">MAJOR PENTA (C)</option>
+                <option value="egyptian">EGYPTIAN</option>
+                <option value="blues">BLUES PENTA</option>
+            </select>
+            <button class="toggle-btn" onclick="toggleAudioDrawer()">▼</button>
+        </div>
+
+        <div class="audio-drawer" id="audio-drawer">
+            <div class="slider-group">
+                <span>GLIDE SPEED:</span>
+                <input type="range" id="glide-speed" min="0.01" max="0.5" step="0.01" value="0.12">
+            </div>
+            <div class="slider-group">
+                <span>MASTER VOL:</span>
+                <input type="range" id="master-vol" min="0.01" max="0.3" step="0.01" value="0.08" onchange="updateCamToneVol()">
+            </div>
+            <div class="slider-group">
+                <span>HARMONIC DETUNE:</span>
+                <input type="range" id="detune-val" min="0" max="25" step="1" value="5" onchange="updateDetune()">
+            </div>
+            <div class="slider-group">
+                <span>REVERB REFLECT:</span>
+                <input type="range" id="reverb-val" min="0" max="0.8" step="0.05" value="0.3" onchange="updateReverb()">
+            </div>
+        </div>
     </div>
 
     <div class="scale-display">
@@ -377,7 +426,9 @@ let audioCtx = null;
 const activeNotes = {};
 
 let camOsc = null;
+let camOsc2 = null;
 let camGain = null;
+let reverbGain = null;
 let devMode = false;
 let webcamActive = false;
 let uploadedImage = null;
@@ -451,6 +502,10 @@ const HUE_BASE_COLORS = [
 
 function toggleSpectrum() {
     document.getElementById("spectrum-drawer").classList.toggle("open");
+}
+
+function toggleAudioDrawer() {
+    document.getElementById("audio-drawer").classList.toggle("open");
 }
 
 function devSelectColor(r, g, b) {
@@ -623,23 +678,58 @@ function initAudio() {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         camOsc = audioCtx.createOscillator();
+        camOsc2 = audioCtx.createOscillator();
         camGain = audioCtx.createGain();
+        reverbGain = audioCtx.createGain();
 
-        camOsc.type = document.getElementById("wave-type").value;
-        camOsc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        const wave = document.getElementById("wave-type").value;
+        camOsc.type = wave;
+        camOsc2.type = wave;
 
-        camGain.gain.setValueAtTime(0.08, audioCtx.currentTime); 
+        const detuneVal = parseFloat(document.getElementById("detune-val").value);
+        camOsc2.detune.setValueAtTime(detuneVal, audioCtx.currentTime);
+
+        const targetVol = parseFloat(document.getElementById("master-vol").value);
+        camGain.gain.setValueAtTime(targetVol, audioCtx.currentTime); 
+
+        const revVal = parseFloat(document.getElementById("reverb-val").value);
+        reverbGain.gain.setValueAtTime(revVal, audioCtx.currentTime);
 
         camOsc.connect(camGain);
+        camOsc2.connect(camGain);
         camGain.connect(audioCtx.destination);
+
         camOsc.start();
+        camOsc2.start();
     }
 }
 
 function updateWaveform() {
     const wave = document.getElementById("wave-type").value;
-    if (camOsc) {
+    if (camOsc && camOsc2) {
         camOsc.type = wave;
+        camOsc2.type = wave;
+    }
+}
+
+function updateCamToneVol() {
+    if (camGain && audioCtx) {
+        const targetVol = parseFloat(document.getElementById("master-vol").value);
+        camGain.gain.setTargetAtTime(targetVol, audioCtx.currentTime, 0.05);
+    }
+}
+
+function updateDetune() {
+    if (camOsc2 && audioCtx) {
+        const detuneVal = parseFloat(document.getElementById("detune-val").value);
+        camOsc2.detune.setTargetAtTime(detuneVal, audioCtx.currentTime, 0.05);
+    }
+}
+
+function updateReverb() {
+    if (reverbGain && audioCtx) {
+        const revVal = parseFloat(document.getElementById("reverb-val").value);
+        reverbGain.gain.setTargetAtTime(revVal, audioCtx.currentTime, 0.05);
     }
 }
 
@@ -674,7 +764,9 @@ function processCameraTone(r, g, b) {
     const scaleKey = document.getElementById("scale-type").value;
     const targetNote = MATRIX_SCALES[scaleKey][hueIndex][shadeIndex];
 
-    camOsc.frequency.setTargetAtTime(targetNote.freq, audioCtx.currentTime, 0.05);
+    const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
+    camOsc.frequency.setTargetAtTime(targetNote.freq, audioCtx.currentTime, glideSpeed);
+    camOsc2.frequency.setTargetAtTime(targetNote.freq, audioCtx.currentTime, glideSpeed);
 }
 
 function startTone(key) {
