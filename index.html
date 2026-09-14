@@ -17,7 +17,7 @@
             min-height: 90vh;
             margin: 0;
             gap: 25px;
-            transition: background-color 0.2s ease;
+            transition: background-color 0.25s ease;
         }
 
         .controls-top {
@@ -191,6 +191,22 @@
             display: grid;
         }
 
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+            font-weight: bold;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            accent-color: #fff;
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+        }
+
         .slider-group {
             display: flex;
             align-items: center;
@@ -203,7 +219,7 @@
             cursor: pointer;
         }
 
-        select {
+        select, input[type="text"] {
             background: rgba(0, 0, 0, 0.4);
             color: #fff;
             border: 1px solid #fff;
@@ -260,6 +276,7 @@
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
             margin-top: -15px;
+            position: relative;
         }
 
         .expandable-container.open {
@@ -308,6 +325,58 @@
             outline: 1px solid #fff;
             transform: scale(1.4);
             box-shadow: 0 0 10px #000;
+        }
+
+        .scale-edit-modal {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            border: 1px solid #fff;
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(10px);
+            padding: 12px 16px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            max-width: 90%;
+            overflow-x: auto;
+        }
+
+        .scale-edit-modal.open {
+            display: flex;
+        }
+
+        .edit-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 4px;
+        }
+
+        .edit-inputs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .edit-input-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.6rem;
+        }
+
+        .edit-input-item input {
+            width: 36px;
+            text-align: center;
+            font-size: 0.7rem;
         }
     </style>
 </head>
@@ -361,7 +430,7 @@
 
             <span>SCALE:</span>
             <select id="scale-type" onchange="updateScaleLabels()">
-                <option value="minor">MINOR PENTA (A)</option>
+                <option value="minor" selected>MINOR PENTA (A)</option>
                 <option value="major">MAJOR PENTA (C)</option>
                 <option value="egyptian">EGYPTIAN</option>
                 <option value="blues">BLUES PENTA</option>
@@ -370,9 +439,37 @@
         </div>
 
         <div class="audio-drawer" id="audio-drawer">
+            <label class="checkbox-group">
+                <input type="checkbox" id="single-tone-mode">
+                <span>SINGLE TONE MODE</span>
+            </label>
+            <label class="checkbox-group">
+                <input type="checkbox" id="vary-scale-repeat" checked>
+                <span>VARY REPEAT SCALE</span>
+            </label>
+            <label class="checkbox-group">
+                <input type="checkbox" id="mute-wasd-tones">
+                <span>MUTE WASD TONES</span>
+            </label>
+            <div class="slider-group">
+                <span>SPEED OF SCALE:</span>
+                <input type="range" id="scale-speed" min="0.05" max="1.0" step="0.05" value="0.20">
+            </div>
+            <div class="slider-group">
+                <span>SCALE LENGTH:</span>
+                <input type="range" id="scale-length" min="3" max="12" step="1" value="8" onchange="updateScaleLengthUI()">
+            </div>
+            <div class="slider-group">
+                <span>PITCH SHIFT:</span>
+                <input type="range" id="master-pitch-shift" min="-2400" max="1200" step="100" value="-2400" onchange="updateMasterPitch()">
+            </div>
             <div class="slider-group">
                 <span>GLIDE SPEED:</span>
-                <input type="range" id="glide-speed" min="0.01" max="0.5" step="0.01" value="0.12">
+                <input type="range" id="glide-speed" min="0.01" max="0.5" step="0.01" value="0.01">
+            </div>
+            <div class="slider-group">
+                <span>FILTER CUTOFF:</span>
+                <input type="range" id="filter-cutoff" min="200" max="8000" step="100" value="3000" onchange="updateFilter()">
             </div>
             <div class="slider-group">
                 <span>MASTER VOL:</span>
@@ -416,6 +513,19 @@
     <div class="expandable-container" id="spectrum-drawer">
         <div class="grid-header">COLOUR TO SOUND</div>
         <div class="stacks-container" id="main-color-stacks"></div>
+
+        <div class="scale-edit-modal" id="scale-modal">
+            <div class="edit-header">
+                <span id="modal-title">EDIT SCALE // [RED 1]</span>
+                <button class="toggle-btn" onclick="closeScaleModal()">✕</button>
+            </div>
+            <div class="slider-group" style="font-size:0.65rem;">
+                <span>HUE SCALE PITCH (SEMITONES):</span>
+                <input type="range" id="modal-pitch-offset" min="-24" max="24" step="1" value="0" oninput="updateHuePitch(this.value)">
+                <span id="modal-pitch-label">0</span>
+            </div>
+            <div class="edit-inputs" id="modal-inputs"></div>
+        </div>
     </div>
 
 <script>
@@ -427,6 +537,7 @@ const activeNotes = {};
 
 let camOsc = null;
 let camOsc2 = null;
+let camFilter = null;
 let camGain = null;
 let reverbGain = null;
 let devMode = false;
@@ -434,9 +545,33 @@ let webcamActive = false;
 let uploadedImage = null;
 let devStream = null;
 
+let lastHueIndex = -1;
+let lastSampledRGB = "";
+
+let currentScaleNotes = [];
+let scaleSequenceTimer = null;
+let melodyStepIndex = 0;
+let melodyPhrasePattern = [0, 2, 1, 3, 2, 4, 1, 5, 3, 2, 4, 0]; 
+
+let activeEditKey = null;
+let activeEditHue = 0;
+let modalLoopTimer = null;
+
 let crosshairX = 160;
 let crosshairY = 120;
 const STEP_SPEED = 3;
+
+const customNoteOverrides = {};
+const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
+
+const NOTE_FREQS = {
+    "C2": 65.41,  "C#2": 69.30,  "D2": 73.42,  "D#2": 77.78,  "E2": 82.41,  "F2": 87.31,  "F#2": 92.50,  "G2": 98.00,  "G#2": 103.83, "A2": 110.00, "A#2": 116.54, "B2": 123.47,
+    "C3": 130.81, "C#3": 138.59, "D3": 146.83, "D#3": 155.56, "E3": 164.81, "F3": 174.61, "F#3": 185.00, "G3": 196.00, "G#3": 207.65, "A3": 220.00, "A#3": 233.08, "B3": 246.94,
+    "C4": 261.63, "C#4": 277.18, "D4": 293.66, "D#4": 311.13, "E4": 329.63, "F4": 349.23, "F#4": 369.99, "G4": 392.00, "G#4": 415.30, "A4": 440.00, "A#4": 466.16, "B4": 493.88,
+    "C5": 523.25, "C#5": 554.37, "D5": 587.33, "D#5": 622.25, "E5": 659.25, "F5": 698.46, "F#5": 739.99, "G5": 783.99, "G#5": 830.61, "A5": 880.00, "A#5": 932.33, "B5": 987.77,
+    "C6": 1046.50,"C#6": 1108.73,"D6": 1174.66,"D#6": 1244.51,"E6": 1318.51,"F6": 1396.91,"F#6": 1479.98,"G6": 1567.98,"G#6": 1661.22,"A6": 1760.00,"A#6": 1864.66,"B6": 1975.53,
+    "C7": 2093.00,"C#7": 2217.46,"D7": 2349.32,"D#7": 2489.02,"E7": 2637.02,"F7": 2793.83,"F#7": 2959.96,"G7": 3135.96,"G#7": 3322.44,"A7": 3520.00,"A#7": 3729.31,"B7": 3951.07
+};
 
 const WASD_SCALES = {
     minor:    { W: { freq: 440.00, note: "A4" }, A: { freq: 523.25, note: "C5" }, S: { freq: 587.33, note: "D5" }, D: { freq: 659.25, note: "E5" } },
@@ -447,44 +582,44 @@ const WASD_SCALES = {
 
 const MATRIX_SCALES = {
     minor: [
-        [{freq:110.00,note:"A2"}, {freq:130.81,note:"C3"}, {freq:146.83,note:"D3"}, {freq:164.81,note:"E3"}, {freq:196.00,note:"G3"}],
-        [{freq:174.61,note:"F3"}, {freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}],
-        [{freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}],
-        [{freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}],
-        [{freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}],
-        [{freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}],
-        [{freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}],
-        [{freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}]
+        [{note:"A2"},{note:"C3"},{note:"D3"},{note:"E3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"}],
+        [{note:"F3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"F4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"F5"},{note:"G5"}],
+        [{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A3"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"}],
+        [{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"}],
+        [{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"}],
+        [{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"}],
+        [{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"}],
+        [{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"},{note:"E8"},{note:"G8"}]
     ],
     major: [
-        [{freq:130.81,note:"C3"}, {freq:146.83,note:"D3"}, {freq:164.81,note:"E3"}, {freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}],
-        [{freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}],
-        [{freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}],
-        [{freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}],
-        [{freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}],
-        [{freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}],
-        [{freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}],
-        [{freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}, {freq:2637.0,note:"E7"}]
+        [{note:"C3"},{note:"D3"},{note:"E3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"}],
+        [{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"}],
+        [{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"}],
+        [{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"}],
+        [{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"}],
+        [{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"}],
+        [{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"}],
+        [{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"},{note:"E8"},{note:"G8"},{note:"A8"}]
     ],
     egyptian: [
-        [{freq:146.83,note:"D3"}, {freq:164.81,note:"E3"}, {freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}],
-        [{freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}],
-        [{freq:293.66,note:"D4"}, {freq:329.63,note:"E4"}, {freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}],
-        [{freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}],
-        [{freq:587.33,note:"D5"}, {freq:659.25,note:"E5"}, {freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}],
-        [{freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}],
-        [{freq:1174.6,note:"D6"}, {freq:1318.5,note:"E6"}, {freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}],
-        [{freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}, {freq:2637.0,note:"E7"}, {freq:3135.9,note:"G7"}]
+        [{note:"D3"},{note:"E3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"}],
+        [{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"}],
+        [{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"}],
+        [{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"}],
+        [{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"}],
+        [{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"}],
+        [{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"},{note:"E8"}],
+        [{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"},{note:"E8"},{note:"G8"},{note:"A8"},{note:"C9"}]
     ],
     blues: [
-        [{freq:110.00,note:"A2"}, {freq:130.81,note:"C3"}, {freq:146.83,note:"D3"}, {freq:155.56,note:"D#3"},{freq:196.00,note:"G3"}],
-        [{freq:155.56,note:"D#3"},{freq:196.00,note:"G3"}, {freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}],
-        [{freq:220.00,note:"A3"}, {freq:261.63,note:"C4"}, {freq:293.66,note:"D4"}, {freq:311.13,note:"D#4"},{freq:392.00,note:"G4"}],
-        [{freq:311.13,note:"D#4"},{freq:392.00,note:"G4"}, {freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}],
-        [{freq:440.00,note:"A4"}, {freq:523.25,note:"C5"}, {freq:587.33,note:"D5"}, {freq:622.25,note:"D#5"},{freq:783.99,note:"G5"}],
-        [{freq:622.25,note:"D#5"},{freq:783.99,note:"G5"}, {freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}],
-        [{freq:880.00,note:"A5"}, {freq:1046.5,note:"C6"}, {freq:1174.6,note:"D6"}, {freq:1244.5,note:"D#6"},{freq:1567.9,note:"G6"}],
-        [{freq:1244.5,note:"D#6"},{freq:1567.9,note:"G6"}, {freq:1760.0,note:"A6"}, {freq:2093.0,note:"C7"}, {freq:2349.3,note:"D7"}]
+        [{note:"A2"},{note:"C3"},{note:"D3"},{note:"D#3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"D#4"},{note:"G4"},{note:"A4"},{note:"C5"}],
+        [{note:"D#3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"D#4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"}],
+        [{note:"A3"},{note:"C4"},{note:"D4"},{note:"D#4"},{note:"G4"},{note:"A3"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"}],
+        [{note:"D#4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"}],
+        [{note:"A4"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"}],
+        [{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"}],
+        [{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"},{note:"A7"},{note:"C8"}],
+        [{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"},{note:"E8"},{note:"G8"}]
     ]
 };
 
@@ -522,6 +657,7 @@ function toggleDevMode() {
     if (!devMode && devStream) {
         stopWebcam();
         document.getElementById("dev-drawer").classList.remove("open");
+        resetToBlack();
     }
 }
 
@@ -542,6 +678,7 @@ async function toggleWebcamDrawer() {
         }
     } else if (!webcamActive) {
         stopWebcam();
+        resetToBlack();
     }
 }
 
@@ -550,6 +687,11 @@ function stopWebcam() {
         devStream.getTracks().forEach(track => track.stop());
         devStream = null;
     }
+}
+
+function resetToBlack() {
+    document.body.style.backgroundColor = "#000000";
+    lastSampledRGB = "";
 }
 
 function handleImageUpload(e) {
@@ -615,9 +757,144 @@ function sampleCanvasAt(x, y) {
         const g = pixel[1];
         const b = pixel[2];
 
+        const rgbStr = `${r},${g},${b}`;
         document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-        processCameraTone(r, g, b);
+        
+        if (rgbStr !== lastSampledRGB) {
+            lastSampledRGB = rgbStr;
+            processCameraTone(r, g, b);
+        }
     } catch (e) {}
+}
+
+function openScaleModal(h, s) {
+    activeEditKey = `${h}-${s}`;
+    activeEditHue = h;
+    const modal = document.getElementById("scale-modal");
+    const title = document.getElementById("modal-title");
+
+    const factor = 0.55 + (s * 0.11);
+    const r = Math.round(HUE_BASE_COLORS[h][0] * factor);
+    const g = Math.round(HUE_BASE_COLORS[h][1] * factor);
+    const b = Math.round(HUE_BASE_COLORS[h][2] * factor);
+    document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+
+    title.innerText = `EDIT SCALE // [${HUE_CODES[h]}${s+1}]`;
+    
+    const pitchOffset = huePitchOffsets[h] || 0;
+    document.getElementById("modal-pitch-offset").value = pitchOffset;
+    document.getElementById("modal-pitch-label").innerText = pitchOffset > 0 ? `+${pitchOffset}` : pitchOffset;
+
+    renderModalInputFields();
+
+    modal.classList.add("open");
+    startModalLoop(h, s);
+}
+
+function renderModalInputFields() {
+    const container = document.getElementById("modal-inputs");
+    container.innerHTML = "";
+
+    const scaleKey = document.getElementById("scale-type").value;
+    const maxLen = parseInt(document.getElementById("scale-length").value);
+    const currentScale = customNoteOverrides[activeEditKey] || MATRIX_SCALES[scaleKey][activeEditHue].slice(0, maxLen).map(item => item.note);
+
+    for (let i = 0; i < maxLen; i++) {
+        const wrap = document.createElement("div");
+        wrap.className = "edit-input-item";
+
+        const lbl = document.createElement("span");
+        lbl.innerText = `N${i+1}`;
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = currentScale[i] || "A4";
+        input.onchange = (e) => {
+            const val = e.target.value.toUpperCase();
+            if (NOTE_FREQS[val]) {
+                if (!customNoteOverrides[activeEditKey]) {
+                    customNoteOverrides[activeEditKey] = [...currentScale];
+                }
+                customNoteOverrides[activeEditKey][i] = val;
+            }
+        };
+
+        wrap.appendChild(lbl);
+        wrap.appendChild(input);
+        container.appendChild(wrap);
+    }
+}
+
+function updateScaleLengthUI() {
+    if (activeEditKey) {
+        renderModalInputFields();
+    }
+}
+
+function updateHuePitch(val) {
+    if (activeEditHue !== undefined) {
+        huePitchOffsets[activeEditHue] = parseInt(val);
+        document.getElementById("modal-pitch-label").innerText = val > 0 ? `+${val}` : val;
+    }
+}
+
+function closeScaleModal() {
+    document.getElementById("scale-modal").classList.remove("open");
+    activeEditKey = null;
+    if (modalLoopTimer) {
+        clearInterval(modalLoopTimer);
+        modalLoopTimer = null;
+    }
+    resetToBlack();
+}
+
+function startModalLoop(h, s) {
+    if (modalLoopTimer) clearInterval(modalLoopTimer);
+    
+    let modalPos = 0;
+    let modalDir = 1;
+
+    const playStep = () => {
+        initAudio();
+        const scaleKey = document.getElementById("scale-type").value;
+        const maxLen = parseInt(document.getElementById("scale-length").value);
+        const currentScale = customNoteOverrides[`${h}-${s}`] || MATRIX_SCALES[scaleKey][h].slice(0, maxLen).map(item => item.note);
+        
+        const isSingleTone = document.getElementById("single-tone-mode").checked;
+        const isVaryMode = document.getElementById("vary-scale-repeat").checked;
+
+        let noteName;
+        if (isSingleTone) {
+            noteName = currentScale[0];
+        } else {
+            noteName = currentScale[modalPos % currentScale.length];
+
+            const stepSize = Math.random() < 0.3 ? 2 : 1;
+            modalPos += modalDir * stepSize;
+
+            if (modalPos >= currentScale.length - 1) {
+                modalPos = currentScale.length - 1;
+                modalDir = -1;
+            } else if (modalPos <= 0) {
+                modalPos = 0;
+                modalDir = 1;
+            } else if (isVaryMode && Math.random() < 0.25) {
+                modalDir *= -1;
+            }
+        }
+
+        let freq = NOTE_FREQS[noteName] || 440;
+        const semitoneShift = huePitchOffsets[h] || 0;
+        freq = freq * Math.pow(2, semitoneShift / 12);
+
+        const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
+        camOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
+        camOsc2.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
+    };
+
+    playStep();
+    const speedMs = parseFloat(document.getElementById("scale-speed").value) * 1000;
+    modalLoopTimer = setInterval(playStep, speedMs);
 }
 
 function buildMatrixUI() {
@@ -641,7 +918,7 @@ function buildMatrixUI() {
             sq.className = "color-square";
             sq.id = `sq-${h}-${s}`;
             sq.style.backgroundColor = `rgb(${r},${g},${b})`;
-            sq.onclick = () => devSelectColor(r, g, b);
+            sq.onclick = () => openScaleModal(h, s);
 
             const label = document.createElement("span");
             label.id = `label-${h}-${s}`;
@@ -679,6 +956,7 @@ function initAudio() {
 
         camOsc = audioCtx.createOscillator();
         camOsc2 = audioCtx.createOscillator();
+        camFilter = audioCtx.createBiquadFilter();
         camGain = audioCtx.createGain();
         reverbGain = audioCtx.createGain();
 
@@ -686,8 +964,15 @@ function initAudio() {
         camOsc.type = wave;
         camOsc2.type = wave;
 
+        camFilter.type = "lowpass";
+        const cutoffFreq = parseFloat(document.getElementById("filter-cutoff").value);
+        camFilter.frequency.setValueAtTime(cutoffFreq, audioCtx.currentTime);
+
+        const shiftCents = parseFloat(document.getElementById("master-pitch-shift").value);
         const detuneVal = parseFloat(document.getElementById("detune-val").value);
-        camOsc2.detune.setValueAtTime(detuneVal, audioCtx.currentTime);
+        
+        camOsc.detune.setValueAtTime(shiftCents, audioCtx.currentTime);
+        camOsc2.detune.setValueAtTime(shiftCents + detuneVal, audioCtx.currentTime);
 
         const targetVol = parseFloat(document.getElementById("master-vol").value);
         camGain.gain.setValueAtTime(targetVol, audioCtx.currentTime); 
@@ -695,14 +980,69 @@ function initAudio() {
         const revVal = parseFloat(document.getElementById("reverb-val").value);
         reverbGain.gain.setValueAtTime(revVal, audioCtx.currentTime);
 
-        camOsc.connect(camGain);
-        camOsc2.connect(camGain);
+        camOsc.connect(camFilter);
+        camOsc2.connect(camFilter);
+        camFilter.connect(camGain);
         camGain.connect(audioCtx.destination);
 
         camOsc.start();
         camOsc2.start();
+
+        startScaleSequencer();
     }
 }
+
+function startScaleSequencer() {
+    if (scaleSequenceTimer) clearInterval(scaleSequenceTimer);
+
+    let mainPos = 0;
+    let mainDir = 1;
+
+    const stepNote = () => {
+        if (!audioCtx || currentScaleNotes.length === 0 || activeEditKey) return;
+
+        const isSingleTone = document.getElementById("single-tone-mode").checked;
+        const isVaryMode = document.getElementById("vary-scale-repeat").checked;
+        
+        let noteName;
+        if (isSingleTone) {
+            noteName = currentScaleNotes[0];
+        } else {
+            noteName = currentScaleNotes[mainPos % currentScaleNotes.length];
+
+            const stepSize = Math.random() < 0.35 ? 2 : 1;
+            mainPos += mainDir * stepSize;
+
+            if (mainPos >= currentScaleNotes.length - 1) {
+                mainPos = currentScaleNotes.length - 1;
+                mainDir = -1;
+            } else if (mainPos <= 0) {
+                mainPos = 0;
+                mainDir = 1;
+            } else if (isVaryMode && Math.random() < 0.25) {
+                mainDir *= -1;
+            }
+        }
+
+        let freq = NOTE_FREQS[noteName] || 440;
+        
+        if (lastMatchedHue !== -1 && huePitchOffsets[lastMatchedHue]) {
+            const shift = huePitchOffsets[lastMatchedHue];
+            freq = freq * Math.pow(2, shift / 12);
+        }
+
+        const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
+        camOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
+        camOsc2.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
+    };
+
+    const speedMs = parseFloat(document.getElementById("scale-speed").value) * 1000;
+    scaleSequenceTimer = setInterval(stepNote, speedMs);
+}
+
+document.getElementById("scale-speed").addEventListener("input", () => {
+    if (audioCtx) startScaleSequencer();
+});
 
 function updateWaveform() {
     const wave = document.getElementById("wave-type").value;
@@ -719,10 +1059,28 @@ function updateCamToneVol() {
     }
 }
 
+function updateFilter() {
+    if (camFilter && audioCtx) {
+        const cutoffFreq = parseFloat(document.getElementById("filter-cutoff").value);
+        camFilter.frequency.setTargetAtTime(cutoffFreq, audioCtx.currentTime, 0.05);
+    }
+}
+
+function updateMasterPitch() {
+    if (camOsc && camOsc2 && audioCtx) {
+        const shiftCents = parseFloat(document.getElementById("master-pitch-shift").value);
+        const detuneVal = parseFloat(document.getElementById("detune-val").value);
+        
+        camOsc.detune.setTargetAtTime(shiftCents, audioCtx.currentTime, 0.05);
+        camOsc2.detune.setTargetAtTime(shiftCents + detuneVal, audioCtx.currentTime, 0.05);
+    }
+}
+
 function updateDetune() {
     if (camOsc2 && audioCtx) {
+        const shiftCents = parseFloat(document.getElementById("master-pitch-shift").value);
         const detuneVal = parseFloat(document.getElementById("detune-val").value);
-        camOsc2.detune.setTargetAtTime(detuneVal, audioCtx.currentTime, 0.05);
+        camOsc2.detune.setTargetAtTime(shiftCents + detuneVal, audioCtx.currentTime, 0.05);
     }
 }
 
@@ -733,43 +1091,73 @@ function updateReverb() {
     }
 }
 
+let lastMatchKey = "";
+let lastMatchedHue = -1;
+
 function processCameraTone(r, g, b) {
+    if (activeEditKey) return; 
+
     initAudio();
     if (!camOsc || !camGain) return;
 
-    let hueIndex = 0;
-    if (r > 180 && g < 80 && b < 80) hueIndex = 0;
-    else if (r > 180 && g >= 80 && g < 180 && b < 100) hueIndex = 1;
-    else if (r > 150 && g > 150 && b < 100) hueIndex = 2;
-    else if (g > r && g > b) hueIndex = 3;
-    else if (g > 100 && b > 100 && r < 100) hueIndex = 4;
-    else if (b > r && b > g && r < 100) hueIndex = 5;
-    else if (r > 100 && b > 150 && g < 100) hueIndex = 6;
-    else hueIndex = 7;
+    let closestHue = 0;
+    let closestShade = 0;
+    let minDistance = Infinity;
 
-    const brightness = (r + g + b) / 3;
-    const shadeIndex = Math.max(0, Math.min(4, Math.floor((brightness / 255) * 5)));
+    for (let h = 0; h < 8; h++) {
+        for (let s = 0; s < 5; s++) {
+            const factor = 0.55 + (s * 0.11);
+            const targetR = Math.round(HUE_BASE_COLORS[h][0] * factor);
+            const targetG = Math.round(HUE_BASE_COLORS[h][1] * factor);
+            const targetB = Math.round(HUE_BASE_COLORS[h][2] * factor);
+
+            const dist = Math.sqrt(
+                Math.pow(r - targetR, 2) +
+                Math.pow(g - targetG, 2) +
+                Math.pow(b - targetB, 2)
+            );
+
+            if (dist < minDistance) {
+                minDistance = dist;
+                closestHue = h;
+                closestShade = s;
+            }
+        }
+    }
+
+    lastMatchKey = `${closestHue}-${closestShade}`;
+    lastMatchedHue = closestHue;
 
     document.querySelectorAll('.color-square, .color-indicator').forEach(el => el.classList.remove('active-shade'));
-    
-    const activeSq = document.getElementById(`sq-${hueIndex}-${shadeIndex}`);
+    const activeSq = document.getElementById(`sq-${closestHue}-${closestShade}`);
     if (activeSq) activeSq.classList.add('active-shade');
 
     const topBarMap = { 0: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
-    if (topBarMap[hueIndex] !== undefined) {
-        const topSq = document.getElementById(`top-sq-${topBarMap[hueIndex]}`);
+    if (topBarMap[closestHue] !== undefined) {
+        const topSq = document.getElementById(`top-sq-${topBarMap[closestHue]}`);
         if (topSq) topSq.classList.add('active-shade');
     }
 
     const scaleKey = document.getElementById("scale-type").value;
-    const targetNote = MATRIX_SCALES[scaleKey][hueIndex][shadeIndex];
+    const maxScaleLen = parseInt(document.getElementById("scale-length").value);
 
-    const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
-    camOsc.frequency.setTargetAtTime(targetNote.freq, audioCtx.currentTime, glideSpeed);
-    camOsc2.frequency.setTargetAtTime(targetNote.freq, audioCtx.currentTime, glideSpeed);
+    if (customNoteOverrides[lastMatchKey]) {
+        currentScaleNotes = customNoteOverrides[lastMatchKey].slice(0, maxScaleLen);
+    } else {
+        currentScaleNotes = MATRIX_SCALES[scaleKey][closestHue].slice(0, maxScaleLen).map(item => item.note);
+    }
+
+    if (closestHue !== lastHueIndex) {
+        lastHueIndex = closestHue;
+        melodyStepIndex = 0;
+    }
 }
 
 function startTone(key) {
+    // Check if WASD tones are muted
+    const isMuted = document.getElementById("mute-wasd-tones").checked;
+    if (isMuted) return;
+
     initAudio();
     if (activeNotes[key]) return;
 
