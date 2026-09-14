@@ -16,7 +16,7 @@
             justify-content: center;
             min-height: 90vh;
             margin: 0;
-            gap: 35px; /* Spaced out sections vertically */
+            gap: 35px;
             transition: background-color 0.2s ease;
         }
 
@@ -24,7 +24,7 @@
             display: flex;
             align-items: center;
             gap: 18px;
-            margin-bottom: 15px; /* Spaced away from WASD */
+            margin-bottom: 15px;
         }
 
         button {
@@ -37,12 +37,26 @@
             cursor: pointer;
         }
 
+        #dev-badge {
+            display: none;
+            background: #fff;
+            color: #000;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        #dev-badge.active {
+            display: inline-block;
+        }
+
         .dpad {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 10px;
-            margin-bottom: 15px; /* Spaced away from Audio box */
+            margin-bottom: 15px;
         }
 
         .row {
@@ -50,10 +64,12 @@
             gap: 10px;
         }
 
+        /* Transparent Key Buttons */
         .dir-btn {
             width: 66px;
             height: 66px;
-            background: #000;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
             color: #fff;
             border: 1px solid #fff;
             font-size: 1.2rem;
@@ -68,6 +84,7 @@
             color: #000;
         }
 
+        /* Transparent Synth Control Bar */
         .synth-bar {
             display: flex;
             align-items: center;
@@ -75,12 +92,13 @@
             border: 1px solid #fff;
             padding: 10px 18px;
             font-size: 0.85rem;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
             margin-bottom: 10px;
         }
 
         select {
-            background: #000;
+            background: rgba(0, 0, 0, 0.4);
             color: #fff;
             border: 1px solid #fff;
             font-family: inherit;
@@ -88,14 +106,15 @@
             text-transform: uppercase;
         }
 
-        /* Top Camera Color Display Box (Replaced WASD Colors) */
+        /* Transparent Camera Bar */
         .scale-display {
             display: flex;
             align-items: center;
             gap: 14px;
             border: 1px solid #fff;
             padding: 10px 18px;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
         }
 
         .note-card {
@@ -106,14 +125,13 @@
             font-weight: bold;
         }
 
-        /* Desaturated Muted Swatches */
         .color-indicator {
             width: 14px;
             height: 14px;
             border: 1px solid #fff;
+            cursor: pointer;
         }
 
-        /* Pure Arrow Toggle Button */
         .toggle-btn {
             background: transparent;
             color: #fff;
@@ -128,14 +146,15 @@
             color: #aaa;
         }
 
-        /* Expandable Camera Spectrum Container */
+        /* Transparent Drawer Container */
         .expandable-container {
             display: none;
             flex-direction: column;
             gap: 10px;
             border: 1px solid #fff;
             padding: 12px 18px;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
             margin-top: -15px;
         }
 
@@ -172,18 +191,19 @@
             font-weight: bold;
         }
 
-        /* White Borders Restored on Swatches */
         .color-square {
             width: 14px;
             height: 14px;
             border: 1px solid #fff;
-            transition: transform 0.1s, box-shadow 0.1s;
+            transition: transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+            cursor: pointer;
         }
 
-        .color-square.active-shade {
+        .color-square.active-shade, .color-indicator.active-shade {
+            border: 2px solid #000 !important;
+            outline: 1px solid #fff;
             transform: scale(1.4);
-            box-shadow: 0 0 8px #fff;
-            background-color: #fff !important;
+            box-shadow: 0 0 10px #000;
         }
     </style>
 </head>
@@ -192,6 +212,7 @@
     <div class="controls-top">
         <button id="connect-btn" onclick="connect()">CONNECT USB</button>
         <span id="status">STATUS: DISCONNECTED</span>
+        <span id="dev-badge">DEV MODE: ACTIVE</span>
     </div>
 
     <div class="dpad">
@@ -205,7 +226,6 @@
         </div>
     </div>
 
-    <!-- Audio & Scale Controls -->
     <div class="synth-bar">
         <span>AUDIO:</span>
         <select id="wave-type" onchange="updateWaveform()">
@@ -224,32 +244,30 @@
         </select>
     </div>
 
-    <!-- Top Primary Camera Colors Bar (Replaced WASD) -->
     <div class="scale-display">
         <div class="note-card">
-            <div class="color-indicator" style="background:#d63651;"></div>
+            <div class="color-indicator" id="top-sq-0" style="background:#d63651;" onclick="devSelectColor(214, 54, 81)"></div>
             <span>R: <span id="top-label-0">A2</span></span>
         </div>
         <div class="note-card">
-            <div class="color-indicator" style="background:#d6b636;"></div>
+            <div class="color-indicator" id="top-sq-1" style="background:#d6b636;" onclick="devSelectColor(214, 182, 54)"></div>
             <span>Y: <span id="top-label-1">A3</span></span>
         </div>
         <div class="note-card">
-            <div class="color-indicator" style="background:#36d65b;"></div>
+            <div class="color-indicator" id="top-sq-2" style="background:#36d65b;" onclick="devSelectColor(54, 214, 91)"></div>
             <span>G: <span id="top-label-2">A4</span></span>
         </div>
         <div class="note-card">
-            <div class="color-indicator" style="background:#36d6d6;"></div>
+            <div class="color-indicator" id="top-sq-3" style="background:#36d6d6;" onclick="devSelectColor(54, 214, 214)"></div>
             <span>C: <span id="top-label-3">A5</span></span>
         </div>
         <div class="note-card">
-            <div class="color-indicator" style="background:#365bd6;"></div>
+            <div class="color-indicator" id="top-sq-4" style="background:#365bd6;" onclick="devSelectColor(54, 91, 214)"></div>
             <span>B: <span id="top-label-4">D5</span></span>
         </div>
         <button class="toggle-btn" onclick="toggleSpectrum()">▼</button>
     </div>
 
-    <!-- Expandable Drawer with White Borders -->
     <div class="expandable-container" id="spectrum-drawer">
         <div class="grid-header">COLOUR TO SOUND</div>
         <div class="stacks-container" id="main-color-stacks"></div>
@@ -264,8 +282,8 @@ const activeNotes = {};
 
 let camOsc = null;
 let camGain = null;
+let devMode = false;
 
-// WASD Directional Pentatonic Notes
 const WASD_SCALES = {
     minor:    { W: { freq: 440.00, note: "A4" }, A: { freq: 523.25, note: "C5" }, S: { freq: 587.33, note: "D5" }, D: { freq: 659.25, note: "E5" } },
     major:    { W: { freq: 261.63, note: "C4" }, A: { freq: 293.66, note: "D4" }, S: { freq: 329.63, note: "E4" }, D: { freq: 392.00, note: "G4" } },
@@ -273,7 +291,6 @@ const WASD_SCALES = {
     blues:    { W: { freq: 220.00, note: "A3" }, A: { freq: 261.63, note: "C4" }, S: { freq: 293.66, note: "D4" }, D: { freq: 311.13, note: "D#4" } }
 };
 
-// 40-Note Expanded Multi-Hue Matrix
 const MATRIX_SCALES = {
     minor: [
         [{freq:110.00,note:"A2"}, {freq:130.81,note:"C3"}, {freq:146.83,note:"D3"}, {freq:164.81,note:"E3"}, {freq:196.00,note:"G3"}],
@@ -318,21 +335,26 @@ const MATRIX_SCALES = {
 };
 
 const HUE_CODES = ["R", "O", "Y", "G", "C", "B", "P", "M"];
-// Slightly Desaturated Muted Base Colors
 const HUE_BASE_COLORS = [
-    [214, 54, 81],    // Red
-    [214, 124, 54],   // Orange
-    [214, 182, 54],   // Yellow
-    [54, 214, 91],    // Green
-    [54, 214, 214],   // Cyan
-    [54, 91, 214],    // Blue
-    [142, 54, 214],   // Purple
-    [214, 54, 182]    // Magenta
+    [214, 54, 81],
+    [214, 124, 54],
+    [214, 182, 54],
+    [54, 214, 91],
+    [54, 214, 214],
+    [54, 91, 214],
+    [142, 54, 214],
+    [214, 54, 182]
 ];
 
 function toggleSpectrum() {
     const drawer = document.getElementById("spectrum-drawer");
     drawer.classList.toggle("open");
+}
+
+function devSelectColor(r, g, b) {
+    if (!devMode) return;
+    document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+    processCameraTone(r, g, b);
 }
 
 function buildMatrixUI() {
@@ -356,6 +378,7 @@ function buildMatrixUI() {
             sq.className = "color-square";
             sq.id = `sq-${h}-${s}`;
             sq.style.backgroundColor = `rgb(${r},${g},${b})`;
+            sq.onclick = () => devSelectColor(r, g, b);
 
             const label = document.createElement("span");
             label.id = `label-${h}-${s}`;
@@ -373,14 +396,12 @@ function updateScaleLabels() {
     const scale = document.getElementById("scale-type").value;
     const matrix = MATRIX_SCALES[scale];
     
-    // Update Top Row Primary Notes (Red, Yellow, Green, Cyan, Blue)
     document.getElementById("top-label-0").innerText = matrix[0][0].note;
     document.getElementById("top-label-1").innerText = matrix[2][0].note;
     document.getElementById("top-label-2").innerText = matrix[3][0].note;
     document.getElementById("top-label-3").innerText = matrix[4][0].note;
     document.getElementById("top-label-4").innerText = matrix[5][0].note;
 
-    // Update Drawer Labels
     for (let h = 0; h < 8; h++) {
         for (let s = 0; s < 5; s++) {
             const label = document.getElementById(`label-${h}-${s}`);
@@ -431,9 +452,16 @@ function processCameraTone(r, g, b) {
     const brightness = (r + g + b) / 3;
     const shadeIndex = Math.max(0, Math.min(4, Math.floor((brightness / 255) * 5)));
 
-    document.querySelectorAll('.color-square').forEach(el => el.classList.remove('active-shade'));
+    document.querySelectorAll('.color-square, .color-indicator').forEach(el => el.classList.remove('active-shade'));
+    
     const activeSq = document.getElementById(`sq-${hueIndex}-${shadeIndex}`);
     if (activeSq) activeSq.classList.add('active-shade');
+
+    const topBarMap = { 0: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
+    if (topBarMap[hueIndex] !== undefined) {
+        const topSq = document.getElementById(`top-sq-${topBarMap[hueIndex]}`);
+        if (topSq) topSq.classList.add('active-shade');
+    }
 
     const scaleKey = document.getElementById("scale-type").value;
     const targetNote = MATRIX_SCALES[scaleKey][hueIndex][shadeIndex];
@@ -545,6 +573,12 @@ function deactivate(key) {
 }
 
 document.addEventListener("keydown", async (e) => {
+    if (e.ctrlKey && e.altKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+        devMode = !devMode;
+        document.getElementById("dev-badge").classList.toggle("active", devMode);
+        return;
+    }
+
     const key = e.key.toLowerCase();
     if (!["w","a","s","d"].includes(key) || keys[key]) return;
     keys[key] = true;
