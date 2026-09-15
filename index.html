@@ -577,7 +577,7 @@ const STEP_SPEED = 3;
 
 const customNoteOverrides = {};
 
-// Reset Red (0), Orange (1), and Yellow (2) to 0 semitones
+// Default pitch offsets set to 0 across all hues
 const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
 
 const NOTE_FREQS = {
@@ -633,7 +633,7 @@ const MATRIX_SCALES = {
         [{note:"A3"},{note:"C4"},{note:"D4"},{note:"D#4"},{note:"G4"},{note:"A3"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"}],
         [{note:"D#4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"}],
         [{note:"A4"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"}],
-        [{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"}],
+        [{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#5"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"}],
         [{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"},{note:"A7"},{note:"C8"}],
         [{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"},{note:"E8"},{note:"G8"}]
     ]
@@ -748,13 +748,11 @@ function toggleRandomRoam() {
 function continuousUpdateLoop() {
     let moved = false;
 
-    // Manual WASD Overrides automated random roaming
     if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
     if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
     if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); targetCrosshairX = crosshairX; moved = true; }
     if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); targetCrosshairX = crosshairX; moved = true; }
 
-    // Smooth movement toward target when random roaming is active
     if (!moved && (crosshairX !== targetCrosshairX || crosshairY !== targetCrosshairY)) {
         if (crosshairX < targetCrosshairX) crosshairX = Math.min(targetCrosshairX, crosshairX + STEP_SPEED);
         if (crosshairX > targetCrosshairX) crosshairX = Math.max(targetCrosshairX, crosshairX - STEP_SPEED);
@@ -931,6 +929,7 @@ function startModalLoop(h, s) {
         const semitoneShift = huePitchOffsets[h] || 0;
         freq = freq * Math.pow(2, semitoneShift / 12);
 
+        freq = getCompensatedFreq(freq);
         applyFrequencyGainCompensation(freq);
 
         const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
@@ -1038,15 +1037,24 @@ function initAudio() {
     }
 }
 
-// Frequency Gain Compensation Curve for Sine Wave Audibility
+// Low-Frequency Audibility Transposition Compensation
+function getCompensatedFreq(freq) {
+    const wave = document.getElementById("wave-type").value;
+    // Transpose sub-audible frequencies up 1 or 2 octaves in Sine and Triangle modes
+    if ((wave === "sine" || wave === "triangle") && freq < 220) {
+        return freq * (freq < 110 ? 4 : 2);
+    }
+    return freq;
+}
+
+// Frequency-Weighted Equal-Loudness Gain Curve
 function applyFrequencyGainCompensation(freq) {
     if (!camGain || !audioCtx) return;
 
     const baseVol = parseFloat(document.getElementById("master-vol").value);
     const wave = document.getElementById("wave-type").value;
 
-    if (wave === "sine") {
-        // Inverse logarithmic gain curve: boosts lower pitch sine waves so they remain audible
+    if (wave === "sine" || wave === "triangle") {
         const boostFactor = Math.max(1.0, Math.min(3.5, 800 / Math.max(freq, 40)));
         camGain.gain.setTargetAtTime(baseVol * boostFactor, audioCtx.currentTime, 0.05);
     } else {
@@ -1093,6 +1101,7 @@ function startScaleSequencer() {
             freq = freq * Math.pow(2, shift / 12);
         }
 
+        freq = getCompensatedFreq(freq);
         applyFrequencyGainCompensation(freq);
 
         const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
