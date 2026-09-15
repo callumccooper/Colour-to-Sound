@@ -168,6 +168,7 @@
             border: 1px solid #fff;
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
+            position: relative;
         }
 
         .synth-bar {
@@ -239,6 +240,7 @@
             padding: 10px 18px;
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
+            position: relative;
         }
 
         .note-card {
@@ -577,6 +579,7 @@ let targetCrosshairY = 120;
 const STEP_SPEED = 3;
 
 const customNoteOverrides = {};
+
 const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
 
 const NOTE_FREQS = {
@@ -610,7 +613,7 @@ const MATRIX_SCALES = {
         [{note:"C3"},{note:"D3"},{note:"E3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"}],
         [{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"}],
         [{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"}],
-        [{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"}],
+        [{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G4"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"}],
         [{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"}],
         [{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"}],
         [{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"E7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"}],
@@ -741,23 +744,34 @@ function toggleRandomRoam() {
             clearInterval(randomRoamTimer);
             randomRoamTimer = null;
         }
+        // Lock targets to current position to stop rubber-banding
+        targetCrosshairX = crosshairX;
+        targetCrosshairY = crosshairY;
     }
 }
 
 function continuousUpdateLoop() {
     let moved = false;
 
-    if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
-    if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
-    if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); targetCrosshairX = crosshairX; moved = true; }
-    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); moved = true; }
+    // Manual Keyboard Controls (Sends hardware commands)
+    if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); targetCrosshairY = crosshairY; moved = true; send("W1"); }
+    if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); targetCrosshairY = crosshairY; moved = true; send("S1"); }
+    if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); targetCrosshairX = crosshairX; moved = true; send("A1"); }
+    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); targetCrosshairX = crosshairX; moved = true; send("D1"); }
 
-    if (!moved && (crosshairX !== targetCrosshairX || crosshairY !== targetCrosshairY)) {
+    // Automated Visual Crosshair Roaming (Only when Roam Mode is ON)
+    const isRoam = document.getElementById("random-roam-mode") ? document.getElementById("random-roam-mode").checked : false;
+    
+    if (!moved && isRoam && (crosshairX !== targetCrosshairX || crosshairY !== targetCrosshairY)) {
         if (crosshairX < targetCrosshairX) crosshairX = Math.min(targetCrosshairX, crosshairX + STEP_SPEED);
         if (crosshairX > targetCrosshairX) crosshairX = Math.max(targetCrosshairX, crosshairX - STEP_SPEED);
         if (crosshairY < targetCrosshairY) crosshairY = Math.min(targetCrosshairY, crosshairY + STEP_SPEED);
         if (crosshairY > targetCrosshairY) crosshairY = Math.max(targetCrosshairY, crosshairY - STEP_SPEED);
         moved = true;
+    } else if (!isRoam) {
+        // Force target to lock to current coordinates when roam is OFF
+        targetCrosshairX = crosshairX;
+        targetCrosshairY = crosshairY;
     }
 
     if (devMode && webcamActive) {
@@ -1020,11 +1034,9 @@ function initAudio() {
         camOsc.type = wave;
         camOsc2.type = wave;
 
-        // Soft saturation drive for warm fundamental harmonics
         waveShaper.curve = makeDistortionCurve(5);
         waveShaper.oversample = '4x';
 
-        // Resonant lowpass filter to make sine and triangle fundamentals pop on small speakers
         camFilter.type = "lowpass";
         camFilter.Q.setValueAtTime(2.5, audioCtx.currentTime);
         const cutoffFreq = parseFloat(document.getElementById("filter-cutoff").value);
@@ -1055,7 +1067,6 @@ function initAudio() {
     }
 }
 
-// Frequency-proportional Gain Boost Curve
 function applyFrequencyGainCompensation(freq) {
     if (!camGain || !audioCtx) return;
 
@@ -1063,7 +1074,6 @@ function applyFrequencyGainCompensation(freq) {
     const wave = document.getElementById("wave-type").value;
 
     if (wave === "sine" || wave === "triangle") {
-        // Boost gain for lower pitches (Red, Orange, Yellow) up to 4.5x base volume
         const boostFactor = Math.max(1.0, Math.min(4.5, 1200 / Math.max(freq, 40)));
         camGain.gain.setTargetAtTime(baseVol * boostFactor, audioCtx.currentTime, 0.05);
     } else {
