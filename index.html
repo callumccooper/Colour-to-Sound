@@ -552,6 +552,7 @@ let camOsc = null;
 let camOsc2 = null;
 let camFilter = null;
 let camGain = null;
+let waveShaper = null;
 let reverbGain = null;
 let devMode = false;
 let webcamActive = false;
@@ -576,8 +577,6 @@ let targetCrosshairY = 120;
 const STEP_SPEED = 3;
 
 const customNoteOverrides = {};
-
-// Default pitch offsets set to 0 across all hues
 const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
 
 const NOTE_FREQS = {
@@ -751,7 +750,7 @@ function continuousUpdateLoop() {
     if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
     if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
     if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); targetCrosshairX = crosshairX; moved = true; }
-    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); targetCrosshairX = crosshairX; moved = true; }
+    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); moved = true; }
 
     if (!moved && (crosshairX !== targetCrosshairX || crosshairY !== targetCrosshairY)) {
         if (crosshairX < targetCrosshairX) crosshairX = Math.min(targetCrosshairX, crosshairX + STEP_SPEED);
@@ -929,7 +928,6 @@ function startModalLoop(h, s) {
         const semitoneShift = huePitchOffsets[h] || 0;
         freq = freq * Math.pow(2, semitoneShift / 12);
 
-        freq = getCompensatedFreq(freq);
         applyFrequencyGainCompensation(freq);
 
         const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
@@ -995,6 +993,18 @@ function updateScaleLabels() {
     }
 }
 
+function makeDistortionCurve(amount = 20) {
+    const k = amount;
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    const deg = Math.PI / 180;
+    for (let i = 0; i < n_samples; ++i) {
+        let x = (i * 2) / n_samples - 1;
+        curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+    }
+    return curve;
+}
+
 function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1002,6 +1012,7 @@ function initAudio() {
         camOsc = audioCtx.createOscillator();
         camOsc2 = audioCtx.createOscillator();
         camFilter = audioCtx.createBiquadFilter();
+        waveShaper = audioCtx.createWaveShaper();
         camGain = audioCtx.createGain();
         reverbGain = audioCtx.createGain();
 
@@ -1009,7 +1020,13 @@ function initAudio() {
         camOsc.type = wave;
         camOsc2.type = wave;
 
+        // Soft saturation drive for warm fundamental harmonics
+        waveShaper.curve = makeDistortionCurve(5);
+        waveShaper.oversample = '4x';
+
+        // Resonant lowpass filter to make sine and triangle fundamentals pop on small speakers
         camFilter.type = "lowpass";
+        camFilter.Q.setValueAtTime(2.5, audioCtx.currentTime);
         const cutoffFreq = parseFloat(document.getElementById("filter-cutoff").value);
         camFilter.frequency.setValueAtTime(cutoffFreq, audioCtx.currentTime);
 
@@ -1025,8 +1042,9 @@ function initAudio() {
         const revVal = parseFloat(document.getElementById("reverb-val").value);
         reverbGain.gain.setValueAtTime(revVal, audioCtx.currentTime);
 
-        camOsc.connect(camFilter);
-        camOsc2.connect(camFilter);
+        camOsc.connect(waveShaper);
+        camOsc2.connect(waveShaper);
+        waveShaper.connect(camFilter);
         camFilter.connect(camGain);
         camGain.connect(audioCtx.destination);
 
@@ -1037,17 +1055,7 @@ function initAudio() {
     }
 }
 
-// Low-Frequency Audibility Transposition Compensation
-function getCompensatedFreq(freq) {
-    const wave = document.getElementById("wave-type").value;
-    // Transpose sub-audible frequencies up 1 or 2 octaves in Sine and Triangle modes
-    if ((wave === "sine" || wave === "triangle") && freq < 220) {
-        return freq * (freq < 110 ? 4 : 2);
-    }
-    return freq;
-}
-
-// Frequency-Weighted Equal-Loudness Gain Curve
+// Frequency-proportional Gain Boost Curve
 function applyFrequencyGainCompensation(freq) {
     if (!camGain || !audioCtx) return;
 
@@ -1055,7 +1063,8 @@ function applyFrequencyGainCompensation(freq) {
     const wave = document.getElementById("wave-type").value;
 
     if (wave === "sine" || wave === "triangle") {
-        const boostFactor = Math.max(1.0, Math.min(3.5, 800 / Math.max(freq, 40)));
+        // Boost gain for lower pitches (Red, Orange, Yellow) up to 4.5x base volume
+        const boostFactor = Math.max(1.0, Math.min(4.5, 1200 / Math.max(freq, 40)));
         camGain.gain.setTargetAtTime(baseVol * boostFactor, audioCtx.currentTime, 0.05);
     } else {
         camGain.gain.setTargetAtTime(baseVol, audioCtx.currentTime, 0.05);
@@ -1101,7 +1110,6 @@ function startScaleSequencer() {
             freq = freq * Math.pow(2, shift / 12);
         }
 
-        freq = getCompensatedFreq(freq);
         applyFrequencyGainCompensation(freq);
 
         const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
