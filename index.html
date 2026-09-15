@@ -178,7 +178,6 @@
             font-size: 0.85rem;
         }
 
-        /* Perfectly Balanced Side-by-Side Audio Drawer Grid */
         .audio-drawer {
             display: none;
             grid-template-columns: 1fr 1fr;
@@ -403,6 +402,10 @@
                 <div class="crosshair-h" id="cross-h"></div>
                 <div class="crosshair-v" id="cross-v"></div>
             </div>
+            <label class="checkbox-group" style="font-size:0.65rem; margin-top:4px;">
+                <input type="checkbox" id="random-roam-mode" onchange="toggleRandomRoam()">
+                <span>RANDOM ROAM (5S)</span>
+            </label>
             <label class="file-label">
                 UPLOAD IMAGE
                 <input type="file" id="img-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
@@ -442,9 +445,7 @@
             <button class="toggle-btn" onclick="toggleAudioDrawer()">▼</button>
         </div>
 
-        <!-- Perfectly Aligned 2-Column Audio Drawer -->
         <div class="audio-drawer" id="audio-drawer">
-            <!-- Row 1: Checkboxes -->
             <label class="checkbox-group">
                 <input type="checkbox" id="single-tone-mode">
                 <span>SINGLE TONE MODE</span>
@@ -454,14 +455,12 @@
                 <span>VARY REPEAT SCALE</span>
             </label>
 
-            <!-- Row 2: Checkbox + Spacer -->
             <label class="checkbox-group">
                 <input type="checkbox" id="mute-wasd-tones">
                 <span>MUTE WASD TONES</span>
             </label>
             <div></div>
 
-            <!-- Row 3: Speed of Scale | Scale Length -->
             <div class="slider-group">
                 <span>SPEED OF SCALE:</span>
                 <input type="range" id="scale-speed" min="0.05" max="1.0" step="0.05" value="0.20">
@@ -471,7 +470,6 @@
                 <input type="range" id="scale-length" min="3" max="12" step="1" value="8" onchange="updateScaleLengthUI()">
             </div>
 
-            <!-- Row 4: Pitch Shift | Glide Speed -->
             <div class="slider-group">
                 <span>PITCH SHIFT:</span>
                 <input type="range" id="master-pitch-shift" min="-2400" max="1200" step="100" value="-2400" onchange="updateMasterPitch()">
@@ -481,7 +479,6 @@
                 <input type="range" id="glide-speed" min="0.01" max="0.5" step="0.01" value="0.01">
             </div>
 
-            <!-- Row 5: Filter Cutoff | Master Vol -->
             <div class="slider-group">
                 <span>FILTER CUTOFF:</span>
                 <input type="range" id="filter-cutoff" min="200" max="8000" step="100" value="3000" onchange="updateFilter()">
@@ -491,7 +488,6 @@
                 <input type="range" id="master-vol" min="0.01" max="0.3" step="0.01" value="0.08" onchange="updateCamToneVol()">
             </div>
 
-            <!-- Row 6: Harmonic Detune | Reverb Reflect -->
             <div class="slider-group">
                 <span>HARMONIC DETUNE:</span>
                 <input type="range" id="detune-val" min="0" max="25" step="1" value="5" onchange="updateDetune()">
@@ -567,8 +563,7 @@ let lastSampledRGB = "";
 
 let currentScaleNotes = [];
 let scaleSequenceTimer = null;
-let melodyStepIndex = 0;
-let melodyPhrasePattern = [0, 2, 1, 3, 2, 4, 1, 5, 3, 2, 4, 0]; 
+let randomRoamTimer = null;
 
 let activeEditKey = null;
 let activeEditHue = 0;
@@ -576,10 +571,14 @@ let modalLoopTimer = null;
 
 let crosshairX = 160;
 let crosshairY = 120;
+let targetCrosshairX = 160;
+let targetCrosshairY = 120;
 const STEP_SPEED = 3;
 
 const customNoteOverrides = {};
-const huePitchOffsets = { 0:24, 1:21, 2:19, 3:0, 4:0, 5:0, 6:0, 7:0 };
+
+// Reset Red (0), Orange (1), and Yellow (2) to 0 semitones
+const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
 
 const NOTE_FREQS = {
     "C2": 65.41,  "C#2": 69.30,  "D2": 73.42,  "D#2": 77.78,  "E2": 82.41,  "F2": 87.31,  "F#2": 92.50,  "G2": 98.00,  "G#2": 103.83, "A2": 110.00, "A#2": 116.54, "B2": 123.47,
@@ -728,13 +727,41 @@ function handleImageUpload(e) {
     reader.readAsDataURL(file);
 }
 
+function toggleRandomRoam() {
+    const isRoam = document.getElementById("random-roam-mode").checked;
+    if (isRoam) {
+        if (randomRoamTimer) clearInterval(randomRoamTimer);
+        randomRoamTimer = setInterval(() => {
+            if (!activeKeys.w && !activeKeys.a && !activeKeys.s && !activeKeys.d) {
+                targetCrosshairX = Math.floor(Math.random() * 320);
+                targetCrosshairY = Math.floor(Math.random() * 240);
+            }
+        }, 5000);
+    } else {
+        if (randomRoamTimer) {
+            clearInterval(randomRoamTimer);
+            randomRoamTimer = null;
+        }
+    }
+}
+
 function continuousUpdateLoop() {
     let moved = false;
 
-    if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); moved = true; }
-    if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); moved = true; }
-    if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); moved = true; }
-    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); moved = true; }
+    // Manual WASD Overrides automated random roaming
+    if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
+    if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); targetCrosshairY = crosshairY; moved = true; }
+    if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); targetCrosshairX = crosshairX; moved = true; }
+    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); targetCrosshairX = crosshairX; moved = true; }
+
+    // Smooth movement toward target when random roaming is active
+    if (!moved && (crosshairX !== targetCrosshairX || crosshairY !== targetCrosshairY)) {
+        if (crosshairX < targetCrosshairX) crosshairX = Math.min(targetCrosshairX, crosshairX + STEP_SPEED);
+        if (crosshairX > targetCrosshairX) crosshairX = Math.max(targetCrosshairX, crosshairX - STEP_SPEED);
+        if (crosshairY < targetCrosshairY) crosshairY = Math.min(targetCrosshairY, crosshairY + STEP_SPEED);
+        if (crosshairY > targetCrosshairY) crosshairY = Math.max(targetCrosshairY, crosshairY - STEP_SPEED);
+        moved = true;
+    }
 
     if (devMode && webcamActive) {
         renderDevCanvas();
@@ -904,6 +931,8 @@ function startModalLoop(h, s) {
         const semitoneShift = huePitchOffsets[h] || 0;
         freq = freq * Math.pow(2, semitoneShift / 12);
 
+        applyFrequencyGainCompensation(freq);
+
         const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
         camOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
         camOsc2.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
@@ -1009,6 +1038,22 @@ function initAudio() {
     }
 }
 
+// Frequency Gain Compensation Curve for Sine Wave Audibility
+function applyFrequencyGainCompensation(freq) {
+    if (!camGain || !audioCtx) return;
+
+    const baseVol = parseFloat(document.getElementById("master-vol").value);
+    const wave = document.getElementById("wave-type").value;
+
+    if (wave === "sine") {
+        // Inverse logarithmic gain curve: boosts lower pitch sine waves so they remain audible
+        const boostFactor = Math.max(1.0, Math.min(3.5, 800 / Math.max(freq, 40)));
+        camGain.gain.setTargetAtTime(baseVol * boostFactor, audioCtx.currentTime, 0.05);
+    } else {
+        camGain.gain.setTargetAtTime(baseVol, audioCtx.currentTime, 0.05);
+    }
+}
+
 function startScaleSequencer() {
     if (scaleSequenceTimer) clearInterval(scaleSequenceTimer);
 
@@ -1047,6 +1092,8 @@ function startScaleSequencer() {
             const shift = huePitchOffsets[lastMatchedHue];
             freq = freq * Math.pow(2, shift / 12);
         }
+
+        applyFrequencyGainCompensation(freq);
 
         const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
         camOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
@@ -1166,7 +1213,6 @@ function processCameraTone(r, g, b) {
 
     if (closestHue !== lastHueIndex) {
         lastHueIndex = closestHue;
-        melodyStepIndex = 0;
     }
 }
 
