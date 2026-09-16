@@ -47,6 +47,7 @@
             font-size: 0.7rem;
             font-weight: bold;
             letter-spacing: 1px;
+            cursor: pointer;
         }
 
         #dev-badge.active {
@@ -109,8 +110,9 @@
         }
 
         #dev-canvas {
-            width: 320px;
-            height: 240px;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
             display: block;
             background: #111;
         }
@@ -424,6 +426,9 @@
             .audio-drawer {
                 grid-template-columns: 1fr;
             }
+            .dpad {
+                display: none !important;
+            }
             .desktop-status-group {
                 display: none !important;
             }
@@ -431,8 +436,8 @@
                 display: block;
             }
             body {
-                padding: 12px;
-                gap: 18px;
+                padding: 16px 12px;
+                gap: 24px;
             }
         }
     </style>
@@ -440,18 +445,17 @@
 <body>
 
     <div class="controls-top">
-        <button id="mobile-test-btn" style="display:none;" onclick="toggleTestDrawerMobile()">TEST</button>
         <div class="desktop-status-group" style="display:flex; align-items:center; gap:18px;">
             <button id="connect-btn" onclick="connect()">CONNECT USB</button>
             <span id="status">USB CNC: DISCONNECTED</span>
         </div>
-        <span id="dev-badge">DEV MODE: ACTIVE</span>
+        <span id="dev-badge" onclick="toggleDevMode()">DEV MODE: ACTIVE</span>
     </div>
 
+    <!-- Dev/Test Panel -->
     <div class="dev-cam-panel" id="dev-cam-panel">
-        <div class="panel-header">
+        <div class="panel-header" id="panel-header-bar">
             <span>TEST</span>
-            <button class="toggle-btn" onclick="toggleWebcamDrawer()">▼</button>
         </div>
         <div class="dev-content" id="dev-drawer">
             <div class="canvas-container" id="canvas-wrap">
@@ -464,8 +468,8 @@
                 <span>RANDOM ROAM (5S)</span>
             </label>
 
+            <!-- Test Options -->
             <button class="action-btn" onclick="loadDefaultTestImage()">LOAD DEFAULT TEST IMAGE</button>
-            <button class="action-btn" onclick="loadGalleryTestImage()">LOAD GALLERY TEST IMAGE</button>
             <button class="action-btn" onclick="startCameraStream()">USE DEVICE CAMERA</button>
             <label class="file-label">
                 UPLOAD IMAGE
@@ -608,7 +612,7 @@
 
     <div class="mobile-bottom-status">
         <button id="mobile-connect-btn" onclick="connect()">CONNECT USB</button>
-        <div id="mobile-status-text" style="margin-top:6px;">USB CNC: DISCONNECTED</div>
+        <div id="mobile-status-text" style="margin-top:8px;">USB CNC: DISCONNECTED</div>
     </div>
 
 <script>
@@ -631,6 +635,7 @@ let devStream = null;
 
 let lastHueIndex = -1;
 let lastSampledRGB = "";
+let currentToneFreq = 0;
 
 let currentScaleNotes = [];
 let scaleSequenceTimer = null;
@@ -650,9 +655,6 @@ const STEP_SPEED = 3;
 
 const customNoteOverrides = {};
 const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
-
-// Actual Exhibition Photo Encoded Directly as Base64 Data URI for Offline Loading
-const GALLERY_IMAGE_BASE64 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='240'><rect width='320' height='240' fill='%23d9d7e0'/><rect x='25' y='65' width='90' height='120' fill='%23223048'/><rect x='30' y='70' width='80' height='110' fill='%238e36d6'/><rect x='135' y='40' width='70' height='65' fill='%231f4e5b'/><rect x='135' y='115' width='70' height='65' fill='%23d67c36'/><rect x='225' y='65' width='75' height='115' fill='%23d63651'/><circle cx='105' cy='180' r='12' fill='%23222'/><circle cx='200' cy='170' r='10' fill='%23222'/></svg>";
 
 const NOTE_FREQS = {
     "C2": 65.41,  "C#2": 69.30,  "D2": 73.42,  "D#2": 77.78,  "E2": 82.41,  "F2": 87.31,  "F#2": 92.50,  "G2": 98.00,  "G#2": 103.83, "A2": 110.00, "A#2": 116.54, "B2": 123.47,
@@ -727,57 +729,79 @@ const HUE_BASE_COLORS = [
 
 function checkMobileLayout() {
     const isMobile = window.innerWidth <= 768 || ('ontouchstart' in window);
-    document.getElementById("mobile-test-btn").style.display = isMobile ? "inline-block" : "none";
     
-    document.querySelector("#w .btn-label").innerText = isMobile ? "▲" : "W";
-    document.querySelector("#a .btn-label").innerText = isMobile ? "◀" : "A";
-    document.querySelector("#s .btn-label").innerText = isMobile ? "▼" : "S";
-    document.querySelector("#d .btn-label").innerText = isMobile ? "▶" : "D";
+    const panel = document.getElementById("dev-cam-panel");
+    const drawer = document.getElementById("dev-drawer");
+    const headerBar = document.getElementById("panel-header-bar");
+
+    if (isMobile) {
+        devMode = true;
+        webcamActive = true;
+        panel.style.display = "flex";
+        drawer.style.display = "flex";
+        if (headerBar) headerBar.style.display = "none";
+    } else {
+        panel.style.display = devMode ? "flex" : "none";
+        drawer.style.display = devMode ? "flex" : "none";
+        if (headerBar) headerBar.style.display = "flex";
+    }
 }
 
-function toggleTestDrawerMobile() {
-    if (!devMode) toggleDevMode();
-    const panel = document.getElementById("dev-cam-panel");
-    panel.classList.toggle("active");
-    toggleWebcamDrawer();
+function generateArtExhibitionImage() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#121218";
+    ctx.fillRect(0, 0, 320, 240);
+
+    const colors = [
+        "#d63651", "#d67c36", "#d6b636", "#36d65b",
+        "#36d6d6", "#365bd6", "#8e36d6", "#d636b6"
+    ];
+
+    const boxW = 55;
+    const boxH = 75;
+    const gapX = 14;
+    const gapY = 16;
+    const totalW = 4 * boxW + 3 * gapX;
+    const startX = (320 - totalW) / 2;
+    const startY = (240 - (2 * boxH + gapY)) / 2;
+
+    colors.forEach((c, i) => {
+        const col = i % 4;
+        const row = Math.floor(i / 4);
+        const x = startX + col * (boxW + gapX);
+        const y = startY + row * (boxH + gapY);
+
+        ctx.fillStyle = c;
+        ctx.fillRect(x, y, boxW, boxH);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, boxW, boxH);
+    });
+
+    return canvas;
 }
 
 function loadDefaultTestImage() {
     stopWebcam();
-    const canvas = document.getElementById("dev-canvas");
-    const ctx = canvas.getContext("2d");
+    initAudio();
+    
     const artCanvas = generateArtExhibitionImage();
-    
     uploadedImage = artCanvas;
-    if (!devMode) toggleDevMode();
-    if (!webcamActive) toggleWebcamDrawer();
+    webcamActive = true;
     
-    ctx.drawImage(artCanvas, 0, 0, 320, 240);
+    renderDevCanvas();
     sampleCanvasAt(160, 120);
-}
-
-function loadGalleryTestImage() {
-    stopWebcam();
-    const canvas = document.getElementById("dev-canvas");
-    const ctx = canvas.getContext("2d");
-    
-    const img = new Image();
-    img.onload = () => {
-        uploadedImage = img;
-        if (!devMode) toggleDevMode();
-        if (!webcamActive) toggleWebcamDrawer();
-        
-        ctx.drawImage(img, 0, 0, 320, 240);
-        sampleCanvasAt(160, 120);
-    };
-    img.src = GALLERY_IMAGE_BASE64;
 }
 
 async function startCameraStream() {
     stopWebcam();
+    initAudio();
     uploadedImage = null;
     webcamActive = true;
-    if (!devMode) toggleDevMode();
     
     try {
         devStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
@@ -795,6 +819,7 @@ function setupTouchDraggableCanvas() {
     
     const handleTouchMove = (e) => {
         e.preventDefault();
+        initAudio();
         const rect = wrap.getBoundingClientRect();
         const touch = e.touches[0];
         const x = Math.max(0, Math.min(319, Math.floor((touch.clientX - rect.left) * (320 / rect.width))));
@@ -840,11 +865,16 @@ function devSelectColor(r, g, b) {
 function toggleDevMode() {
     devMode = !devMode;
     document.getElementById("dev-badge").classList.toggle("active", devMode);
-    document.getElementById("dev-cam-panel").classList.toggle("active", devMode);
     
-    if (!devMode && devStream) {
+    const panel = document.getElementById("dev-cam-panel");
+    const drawer = document.getElementById("dev-drawer");
+
+    panel.style.display = devMode ? "flex" : "none";
+    drawer.style.display = devMode ? "flex" : "none";
+
+    if (!devMode) {
         stopWebcam();
-        document.getElementById("dev-drawer").classList.remove("open");
+        uploadedImage = null;
         resetToBlack();
     }
 }
@@ -852,10 +882,11 @@ function toggleDevMode() {
 async function toggleWebcamDrawer() {
     const drawer = document.getElementById("dev-drawer");
     drawer.classList.toggle("open");
-    webcamActive = drawer.classList.contains("open");
-
-    if (!webcamActive) {
+    
+    const isOpen = drawer.classList.contains("open");
+    if (!isOpen) {
         stopWebcam();
+        uploadedImage = null;
         resetToBlack();
     }
 }
@@ -870,6 +901,7 @@ function stopWebcam() {
 function resetToBlack() {
     document.body.style.backgroundColor = "#000000";
     lastSampledRGB = "";
+    uploadedImage = null;
 }
 
 function handleImageUpload(e) {
@@ -877,12 +909,16 @@ function handleImageUpload(e) {
     if (!file) return;
 
     stopWebcam();
+    initAudio();
+    webcamActive = true;
+    
     const reader = new FileReader();
     reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
             uploadedImage = img;
             renderDevCanvas();
+            sampleCanvasAt(160, 120);
         };
         img.src = event.target.result;
     };
@@ -932,10 +968,8 @@ function continuousUpdateLoop() {
         targetCrosshairY = crosshairY;
     }
 
-    if (devMode && webcamActive) {
-        renderDevCanvas();
-        if (moved) updateCrosshairVisuals();
-    }
+    renderDevCanvas();
+    if (moved) updateCrosshairVisuals();
 
     requestAnimationFrame(continuousUpdateLoop);
 }
@@ -943,6 +977,18 @@ function continuousUpdateLoop() {
 function renderDevCanvas() {
     const canvas = document.getElementById("dev-canvas");
     const ctx = canvas.getContext("2d");
+
+    const drawer = document.getElementById("dev-drawer");
+    const isDrawerOpen = drawer ? drawer.classList.contains("open") || window.innerWidth <= 768 : false;
+
+    if (!devMode && !isDrawerOpen) {
+        uploadedImage = null;
+        stopWebcam();
+        resetToBlack();
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(0, 0, 320, 240);
+        return;
+    }
 
     if (uploadedImage) {
         ctx.drawImage(uploadedImage, 0, 0, 320, 240);
@@ -953,6 +999,9 @@ function renderDevCanvas() {
             ctx.drawImage(video, 0, 0, 320, 240);
             sampleCanvasAt(Math.floor(crosshairX), Math.floor(crosshairY));
         }
+    } else {
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(0, 0, 320, 240);
     }
 }
 
@@ -1223,6 +1272,9 @@ function initAudio() {
 
         startScaleSequencer();
     }
+    if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+    }
 }
 
 function applyFrequencyGainCompensation(freq) {
@@ -1280,11 +1332,13 @@ function startScaleSequencer() {
             freq = freq * Math.pow(2, shift / 12);
         }
 
-        applyFrequencyGainCompensation(freq);
-
-        const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
-        camOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
-        camOsc2.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
+        if (freq !== currentToneFreq) {
+            currentToneFreq = freq;
+            applyFrequencyGainCompensation(freq);
+            const glideSpeed = parseFloat(document.getElementById("glide-speed").value);
+            camOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
+            camOsc2.frequency.setTargetAtTime(freq, audioCtx.currentTime, glideSpeed);
+        }
     };
 
     const speedMs = parseFloat(document.getElementById("scale-speed").value) * 1000;
@@ -1516,6 +1570,7 @@ function deactivate(key) {
 }
 
 document.addEventListener("keydown", async (e) => {
+    initAudio();
     if (e.ctrlKey && e.altKey && e.shiftKey && e.key.toLowerCase() === 'd') {
         toggleDevMode();
         return;
@@ -1540,8 +1595,11 @@ document.addEventListener("keyup", async (e) => {
     await send(key.toUpperCase() + "0");
 });
 
+document.addEventListener("touchstart", () => { initAudio(); }, { once: true });
+
 ["w","a","s","d"].forEach(id => {
     const btn = document.getElementById(id);
+    if (!btn) return;
     btn.addEventListener("mousedown", async () => { activeKeys[id] = true; activate(id); await send(id.toUpperCase() + "1"); });
     btn.addEventListener("mouseup", async () => { activeKeys[id] = false; deactivate(id); await send(id.toUpperCase() + "0"); });
     btn.addEventListener("mouseleave", async () => { activeKeys[id] = false; deactivate(id); await send(id.toUpperCase() + "0"); });
