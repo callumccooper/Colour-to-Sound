@@ -100,7 +100,7 @@
             width: 320px;
             height: 240px;
             border: 1px solid #fff;
-            background: #111;
+            background: transparent;
             overflow: hidden;
             touch-action: none;
             cursor: crosshair;
@@ -114,7 +114,7 @@
             height: 100%;
             object-fit: contain;
             display: block;
-            background: #111;
+            background: transparent;
         }
 
         .crosshair-h, .crosshair-v {
@@ -183,17 +183,18 @@
             color: #000;
         }
 
-        .synth-bar-wrapper {
+        /* Balanced Outer Panel Controls */
+        .synth-bar-wrapper, .scale-display-wrapper {
             display: flex;
             flex-direction: column;
             border: 1px solid #fff;
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
             position: relative;
-            max-width: 100%;
+            box-sizing: border-box;
         }
 
-        .synth-bar {
+        .synth-bar, .scale-bar {
             display: flex;
             align-items: center;
             gap: 15px;
@@ -203,18 +204,29 @@
             justify-content: center;
         }
 
-        .audio-drawer {
+        .audio-drawer, .spectrum-drawer {
             display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px 24px;
             padding: 14px 18px;
             border-top: 1px solid rgba(255, 255, 255, 0.3);
             font-size: 0.75rem;
+            box-sizing: border-box;
+        }
+
+        .audio-drawer {
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 24px;
             align-items: center;
         }
 
         .audio-drawer.open {
             display: grid;
+        }
+
+        .spectrum-drawer.open {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
         }
 
         .checkbox-group {
@@ -256,19 +268,6 @@
             text-transform: uppercase;
         }
 
-        .scale-display {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            border: 1px solid #fff;
-            padding: 10px 18px;
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(6px);
-            position: relative;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
         .note-card {
             display: flex;
             align-items: center;
@@ -296,22 +295,6 @@
 
         .toggle-btn:hover {
             color: #aaa;
-        }
-
-        .expandable-container {
-            display: none;
-            flex-direction: column;
-            gap: 10px;
-            border: 1px solid #fff;
-            padding: 12px 18px;
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(6px);
-            margin-top: -15px;
-            position: relative;
-        }
-
-        .expandable-container.open {
-            display: flex;
         }
 
         .grid-header {
@@ -433,11 +416,15 @@
                 display: none !important;
             }
             .mobile-bottom-status {
-                display: block;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+                margin-top: 15px;
             }
             body {
                 padding: 16px 12px;
-                gap: 24px;
+                gap: 20px;
             }
         }
     </style>
@@ -452,7 +439,7 @@
         <span id="dev-badge" onclick="toggleDevMode()">DEV MODE: ACTIVE</span>
     </div>
 
-    <!-- Dev/Test Panel -->
+    <!-- Test Panel -->
     <div class="dev-cam-panel" id="dev-cam-panel">
         <div class="panel-header" id="panel-header-bar">
             <span>TEST</span>
@@ -468,7 +455,7 @@
                 <span>RANDOM ROAM (5S)</span>
             </label>
 
-            <!-- Test Options -->
+            <!-- Test Controls -->
             <button class="action-btn" onclick="loadDefaultTestImage()">LOAD DEFAULT TEST IMAGE</button>
             <button class="action-btn" onclick="startCameraStream()">USE DEVICE CAMERA</button>
             <label class="file-label">
@@ -491,6 +478,7 @@
         </div>
     </div>
 
+    <!-- Audio Settings Menu -->
     <div class="synth-bar-wrapper">
         <div class="synth-bar">
             <span>AUDIO:</span>
@@ -568,51 +556,54 @@
         </div>
     </div>
 
-    <div class="scale-display">
-        <div class="note-card">
-            <div class="color-indicator" id="top-sq-0" style="background:#d63651;" onclick="devSelectColor(214, 54, 81)"></div>
-            <span>R: <span id="top-label-0">A2</span></span>
-        </div>
-        <div class="note-card">
-            <div class="color-indicator" id="top-sq-1" style="background:#d6b636;" onclick="devSelectColor(214, 182, 54)"></div>
-            <span>Y: <span id="top-label-1">A3</span></span>
-        </div>
-        <div class="note-card">
-            <div class="color-indicator" id="top-sq-2" style="background:#36d65b;" onclick="devSelectColor(54, 214, 91)"></div>
-            <span>G: <span id="top-label-2">A4</span></span>
-        </div>
-        <div class="note-card">
-            <div class="color-indicator" id="top-sq-3" style="background:#36d6d6;" onclick="devSelectColor(54, 214, 214)"></div>
-            <span>C: <span id="top-label-3">A5</span></span>
-        </div>
-        <div class="note-card">
-            <div class="color-indicator" id="top-sq-4" style="background:#365bd6;" onclick="devSelectColor(54, 91, 214)"></div>
-            <span>B: <span id="top-label-4">D5</span></span>
-        </div>
-        <button class="toggle-btn" onclick="toggleSpectrum()">▼</button>
-    </div>
-
-    <div class="expandable-container" id="spectrum-drawer">
-        <div class="grid-header">COLOUR TO SOUND</div>
-        <div class="stacks-container" id="main-color-stacks"></div>
-
-        <div class="scale-edit-modal" id="scale-modal">
-            <div class="edit-header">
-                <span id="modal-title">EDIT SCALE // [RED 1]</span>
-                <button class="toggle-btn" onclick="closeScaleModal()">✕</button>
+    <!-- Integrated Colour-to-Sound Display & Expandable Drawer -->
+    <div class="scale-display-wrapper">
+        <div class="scale-bar">
+            <div class="note-card">
+                <div class="color-indicator" id="top-sq-0" style="background:#d63651;" onclick="devSelectColor(214, 54, 81)"></div>
+                <span>R:<span id="top-label-0">A2</span></span>
             </div>
-            <div class="slider-group" style="font-size:0.65rem;">
-                <span>HUE SCALE PITCH (SEMITONES):</span>
-                <input type="range" id="modal-pitch-offset" min="-24" max="24" step="1" value="0" oninput="updateHuePitch(this.value)">
-                <span id="modal-pitch-label">0</span>
+            <div class="note-card">
+                <div class="color-indicator" id="top-sq-1" style="background:#d6b636;" onclick="devSelectColor(214, 182, 54)"></div>
+                <span>Y:<span id="top-label-1">A3</span></span>
             </div>
-            <div class="edit-inputs" id="modal-inputs"></div>
+            <div class="note-card">
+                <div class="color-indicator" id="top-sq-2" style="background:#36d65b;" onclick="devSelectColor(54, 214, 91)"></div>
+                <span>G:<span id="top-label-2">A4</span></span>
+            </div>
+            <div class="note-card">
+                <div class="color-indicator" id="top-sq-3" style="background:#36d6d6;" onclick="devSelectColor(54, 214, 214)"></div>
+                <span>C:<span id="top-label-3">A5</span></span>
+            </div>
+            <div class="note-card">
+                <div class="color-indicator" id="top-sq-4" style="background:#365bd6;" onclick="devSelectColor(54, 91, 214)"></div>
+                <span>B:<span id="top-label-4">D5</span></span>
+            </div>
+            <button class="toggle-btn" onclick="toggleSpectrum()">▼</button>
+        </div>
+
+        <div class="spectrum-drawer" id="spectrum-drawer">
+            <div class="grid-header">COLOUR TO SOUND</div>
+            <div class="stacks-container" id="main-color-stacks"></div>
+
+            <div class="scale-edit-modal" id="scale-modal">
+                <div class="edit-header">
+                    <span id="modal-title">EDIT SCALE // [RED 1]</span>
+                    <button class="toggle-btn" onclick="closeScaleModal()">✕</button>
+                </div>
+                <div class="slider-group" style="font-size:0.65rem;">
+                    <span>HUE SCALE PITCH (SEMITONES):</span>
+                    <input type="range" id="modal-pitch-offset" min="-24" max="24" step="1" value="0" oninput="updateHuePitch(this.value)">
+                    <span id="modal-pitch-label">0</span>
+                </div>
+                <div class="edit-inputs" id="modal-inputs"></div>
+            </div>
         </div>
     </div>
 
     <div class="mobile-bottom-status">
         <button id="mobile-connect-btn" onclick="connect()">CONNECT USB</button>
-        <div id="mobile-status-text" style="margin-top:8px;">USB CNC: DISCONNECTED</div>
+        <div id="mobile-status-text">USB CNC: DISCONNECTED</div>
     </div>
 
 <script>
@@ -685,7 +676,7 @@ const MATRIX_SCALES = {
     ],
     major: [
         [{note:"C3"},{note:"D3"},{note:"E3"},{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"}],
-        [{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"}],
+        [{note:"G3"},{note:"A3"},{note:"C4"},{note:"D4"},{note:"E4"},{note:"G3"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"}],
         [{note:"C4"},{note:"D4"},{note:"E4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"}],
         [{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"E5"},{note:"G4"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"}],
         [{note:"C5"},{note:"D5"},{note:"E5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"E6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"}],
@@ -753,8 +744,7 @@ function generateArtExhibitionImage() {
     canvas.height = 240;
     const ctx = canvas.getContext("2d");
 
-    ctx.fillStyle = "#121218";
-    ctx.fillRect(0, 0, 320, 240);
+    ctx.clearRect(0, 0, 320, 240);
 
     const colors = [
         "#d63651", "#d67c36", "#d6b636", "#36d65b",
@@ -849,7 +839,8 @@ function notifyUserActivity() {
 }
 
 function toggleSpectrum() {
-    document.getElementById("spectrum-drawer").classList.toggle("open");
+    const drawer = document.getElementById("spectrum-drawer");
+    drawer.classList.toggle("open");
 }
 
 function toggleAudioDrawer() {
@@ -985,10 +976,11 @@ function renderDevCanvas() {
         uploadedImage = null;
         stopWebcam();
         resetToBlack();
-        ctx.fillStyle = "#111111";
-        ctx.fillRect(0, 0, 320, 240);
+        ctx.clearRect(0, 0, 320, 240);
         return;
     }
+
+    ctx.clearRect(0, 0, 320, 240);
 
     if (uploadedImage) {
         ctx.drawImage(uploadedImage, 0, 0, 320, 240);
@@ -999,9 +991,6 @@ function renderDevCanvas() {
             ctx.drawImage(video, 0, 0, 320, 240);
             sampleCanvasAt(Math.floor(crosshairX), Math.floor(crosshairY));
         }
-    } else {
-        ctx.fillStyle = "#111111";
-        ctx.fillRect(0, 0, 320, 240);
     }
 }
 
@@ -1376,8 +1365,8 @@ function updateMasterPitch() {
         const shiftCents = parseFloat(document.getElementById("master-pitch-shift").value);
         const detuneVal = parseFloat(document.getElementById("detune-val").value);
         
-        camOsc.detune.setTargetAtTime(shiftCents, audioCtx.currentTime, 0.05);
-        camOsc2.detune.setTargetAtTime(shiftCents + detuneVal, audioCtx.currentTime, 0.05);
+        camOsc.detune.setTargetAtTime(shiftCents, audioCtx.currentTime);
+        camOsc2.detune.setTargetAtTime(shiftCents + detuneVal, audioCtx.currentTime);
     }
 }
 
@@ -1385,7 +1374,7 @@ function updateDetune() {
     if (camOsc2 && audioCtx) {
         const shiftCents = parseFloat(document.getElementById("master-pitch-shift").value);
         const detuneVal = parseFloat(document.getElementById("detune-val").value);
-        camOsc2.detune.setTargetAtTime(shiftCents + detuneVal, audioCtx.currentTime, 0.05);
+        camOsc2.detune.setTargetAtTime(shiftCents + detuneVal, audioCtx.currentTime);
     }
 }
 
