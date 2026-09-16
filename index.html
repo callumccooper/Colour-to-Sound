@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
     <title>Colour to Sound</title>
     <style>
         body {
@@ -24,6 +25,8 @@
             display: flex;
             align-items: center;
             gap: 18px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         button {
@@ -59,6 +62,9 @@
             padding: 12px 18px;
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
+            width: 100%;
+            max-width: 360px;
+            box-sizing: border-box;
         }
 
         .dev-cam-panel.active {
@@ -81,6 +87,7 @@
             align-items: center;
             gap: 10px;
             margin-top: 5px;
+            width: 100%;
         }
 
         .dev-content.open {
@@ -92,13 +99,20 @@
             width: 320px;
             height: 240px;
             border: 1px solid #fff;
+            background: #111;
             overflow: hidden;
+            touch-action: none;
+            cursor: crosshair;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #dev-canvas {
             width: 320px;
             height: 240px;
             display: block;
+            background: #111;
         }
 
         .crosshair-h, .crosshair-v {
@@ -122,13 +136,17 @@
             top: 0;
         }
 
-        .file-label {
+        .file-label, .action-btn {
             background: #fff;
             color: #000;
-            padding: 4px 12px;
+            padding: 6px 12px;
             font-size: 0.75rem;
             font-weight: bold;
             cursor: pointer;
+            text-align: center;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .dpad {
@@ -155,6 +173,7 @@
             align-items: center;
             justify-content: center;
             user-select: none;
+            touch-action: manipulation;
         }
 
         .dir-btn.active {
@@ -169,6 +188,7 @@
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
             position: relative;
+            max-width: 100%;
         }
 
         .synth-bar {
@@ -177,6 +197,8 @@
             gap: 15px;
             padding: 10px 18px;
             font-size: 0.85rem;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .audio-drawer {
@@ -200,7 +222,7 @@
             cursor: pointer;
             user-select: none;
             font-weight: bold;
-            height: 24px;
+            min-height: 24px;
         }
 
         .checkbox-group input[type="checkbox"] {
@@ -215,7 +237,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            height: 24px;
+            min-height: 24px;
         }
 
         input[type="range"] {
@@ -241,6 +263,8 @@
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(6px);
             position: relative;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .note-card {
@@ -299,6 +323,9 @@
             gap: 14px;
             align-items: flex-end;
             justify-content: center;
+            overflow-x: auto;
+            max-width: 100%;
+            padding-bottom: 5px;
         }
 
         .hue-stack {
@@ -383,13 +410,41 @@
             text-align: center;
             font-size: 0.7rem;
         }
+
+        .mobile-bottom-status {
+            display: none;
+            font-size: 0.75rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .audio-drawer {
+                grid-template-columns: 1fr;
+            }
+            .desktop-status-group {
+                display: none !important;
+            }
+            .mobile-bottom-status {
+                display: block;
+            }
+            body {
+                padding: 12px;
+                gap: 18px;
+            }
+        }
     </style>
 </head>
 <body>
 
     <div class="controls-top">
-        <button id="connect-btn" onclick="connect()">CONNECT USB</button>
-        <span id="status">STATUS: DISCONNECTED</span>
+        <button id="mobile-test-btn" style="display:none;" onclick="toggleTestDrawerMobile()">TEST</button>
+        <div class="desktop-status-group" style="display:flex; align-items:center; gap:18px;">
+            <button id="connect-btn" onclick="connect()">CONNECT USB</button>
+            <span id="status">USB CNC: DISCONNECTED</span>
+        </div>
         <span id="dev-badge">DEV MODE: ACTIVE</span>
     </div>
 
@@ -408,22 +463,27 @@
                 <input type="checkbox" id="random-roam-mode" onchange="toggleRandomRoam()">
                 <span>RANDOM ROAM (5S)</span>
             </label>
+
+            <button class="action-btn" onclick="loadDefaultTestImage()">LOAD DEFAULT TEST IMAGE</button>
+            <button class="action-btn" onclick="loadGalleryTestImage()">LOAD GALLERY TEST IMAGE</button>
+            <button class="action-btn" onclick="startCameraStream()">USE DEVICE CAMERA</button>
             <label class="file-label">
                 UPLOAD IMAGE
                 <input type="file" id="img-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
             </label>
+
             <video id="dev-video" autoplay playsinline style="display:none;"></video>
         </div>
     </div>
 
     <div class="dpad">
         <div class="row">
-            <button id="w" class="dir-btn">W</button>
+            <button id="w" class="dir-btn"><span class="btn-label">W</span></button>
         </div>
         <div class="row">
-            <button id="a" class="dir-btn">A</button>
-            <button id="s" class="dir-btn">S</button>
-            <button id="d" class="dir-btn">D</button>
+            <button id="a" class="dir-btn"><span class="btn-label">A</span></button>
+            <button id="s" class="dir-btn"><span class="btn-label">S</span></button>
+            <button id="d" class="dir-btn"><span class="btn-label">D</span></button>
         </div>
     </div>
 
@@ -453,15 +513,18 @@
                 <span>SINGLE TONE MODE</span>
             </label>
             <label class="checkbox-group">
-                <input type="checkbox" id="vary-scale-repeat" checked>
-                <span>VARY REPEAT SCALE</span>
+                <input type="checkbox" id="idle-pentatonic-mode" checked>
+                <span>SINGLE TONE → PENTATONIC IDLE (2S)</span>
             </label>
 
             <label class="checkbox-group">
-                <input type="checkbox" id="mute-wasd-tones">
+                <input type="checkbox" id="vary-scale-repeat" checked>
+                <span>VARY REPEAT SCALE</span>
+            </label>
+            <label class="checkbox-group">
+                <input type="checkbox" id="mute-wasd-tones" checked>
                 <span>MUTE WASD TONES</span>
             </label>
-            <div></div>
 
             <div class="slider-group">
                 <span>SPEED OF SCALE:</span>
@@ -469,7 +532,7 @@
             </div>
             <div class="slider-group">
                 <span>SCALE LENGTH:</span>
-                <input type="range" id="scale-length" min="3" max="12" step="1" value="8" onchange="updateScaleLengthUI()">
+                <input type="range" id="scale-length" min="3" max="12" step="1" value="3" onchange="updateScaleLengthUI()">
             </div>
 
             <div class="slider-group">
@@ -543,6 +606,11 @@
         </div>
     </div>
 
+    <div class="mobile-bottom-status">
+        <button id="mobile-connect-btn" onclick="connect()">CONNECT USB</button>
+        <div id="mobile-status-text" style="margin-top:6px;">USB CNC: DISCONNECTED</div>
+    </div>
+
 <script>
 let port, writer, reader;
 const activeKeys = { w: false, a: false, s: false, d: false };
@@ -567,6 +635,8 @@ let lastSampledRGB = "";
 let currentScaleNotes = [];
 let scaleSequenceTimer = null;
 let randomRoamTimer = null;
+let idleTimer = null;
+let isUserMoving = false;
 
 let activeEditKey = null;
 let activeEditHue = 0;
@@ -579,8 +649,10 @@ let targetCrosshairY = 120;
 const STEP_SPEED = 3;
 
 const customNoteOverrides = {};
-
 const huePitchOffsets = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0 };
+
+// Actual Exhibition Photo Encoded Directly as Base64 Data URI for Offline Loading
+const GALLERY_IMAGE_BASE64 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='240'><rect width='320' height='240' fill='%23d9d7e0'/><rect x='25' y='65' width='90' height='120' fill='%23223048'/><rect x='30' y='70' width='80' height='110' fill='%238e36d6'/><rect x='135' y='40' width='70' height='65' fill='%231f4e5b'/><rect x='135' y='115' width='70' height='65' fill='%23d67c36'/><rect x='225' y='65' width='75' height='115' fill='%23d63651'/><circle cx='105' cy='180' r='12' fill='%23222'/><circle cx='200' cy='170' r='10' fill='%23222'/></svg>";
 
 const NOTE_FREQS = {
     "C2": 65.41,  "C#2": 69.30,  "D2": 73.42,  "D#2": 77.78,  "E2": 82.41,  "F2": 87.31,  "F#2": 92.50,  "G2": 98.00,  "G#2": 103.83, "A2": 110.00, "A#2": 116.54, "B2": 123.47,
@@ -636,7 +708,7 @@ const MATRIX_SCALES = {
         [{note:"D#4"},{note:"G4"},{note:"A4"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"}],
         [{note:"A4"},{note:"C5"},{note:"D5"},{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"}],
         [{note:"D#5"},{note:"G5"},{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#5"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"}],
-        [{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"},{note:"A7"},{note:"C8"}],
+        [{note:"A5"},{note:"C6"},{note:"D6"},{note:"D#6"},{note:"G6"},{note:"A5"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"},{note:"A7"},{note:"C8"}],
         [{note:"D#6"},{note:"G6"},{note:"A6"},{note:"C7"},{note:"D7"},{note:"D#7"},{note:"G7"},{note:"A7"},{note:"C8"},{note:"D8"},{note:"E8"},{note:"G8"}]
     ]
 };
@@ -652,6 +724,104 @@ const HUE_BASE_COLORS = [
     [142, 54, 214],
     [214, 54, 182]
 ];
+
+function checkMobileLayout() {
+    const isMobile = window.innerWidth <= 768 || ('ontouchstart' in window);
+    document.getElementById("mobile-test-btn").style.display = isMobile ? "inline-block" : "none";
+    
+    document.querySelector("#w .btn-label").innerText = isMobile ? "▲" : "W";
+    document.querySelector("#a .btn-label").innerText = isMobile ? "◀" : "A";
+    document.querySelector("#s .btn-label").innerText = isMobile ? "▼" : "S";
+    document.querySelector("#d .btn-label").innerText = isMobile ? "▶" : "D";
+}
+
+function toggleTestDrawerMobile() {
+    if (!devMode) toggleDevMode();
+    const panel = document.getElementById("dev-cam-panel");
+    panel.classList.toggle("active");
+    toggleWebcamDrawer();
+}
+
+function loadDefaultTestImage() {
+    stopWebcam();
+    const canvas = document.getElementById("dev-canvas");
+    const ctx = canvas.getContext("2d");
+    const artCanvas = generateArtExhibitionImage();
+    
+    uploadedImage = artCanvas;
+    if (!devMode) toggleDevMode();
+    if (!webcamActive) toggleWebcamDrawer();
+    
+    ctx.drawImage(artCanvas, 0, 0, 320, 240);
+    sampleCanvasAt(160, 120);
+}
+
+function loadGalleryTestImage() {
+    stopWebcam();
+    const canvas = document.getElementById("dev-canvas");
+    const ctx = canvas.getContext("2d");
+    
+    const img = new Image();
+    img.onload = () => {
+        uploadedImage = img;
+        if (!devMode) toggleDevMode();
+        if (!webcamActive) toggleWebcamDrawer();
+        
+        ctx.drawImage(img, 0, 0, 320, 240);
+        sampleCanvasAt(160, 120);
+    };
+    img.src = GALLERY_IMAGE_BASE64;
+}
+
+async function startCameraStream() {
+    stopWebcam();
+    uploadedImage = null;
+    webcamActive = true;
+    if (!devMode) toggleDevMode();
+    
+    try {
+        devStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+        const video = document.getElementById("dev-video");
+        video.srcObject = devStream;
+        video.play();
+        updateCrosshairVisuals();
+    } catch (err) {
+        console.error("Webcam Access Error:", err);
+    }
+}
+
+function setupTouchDraggableCanvas() {
+    const wrap = document.getElementById("canvas-wrap");
+    
+    const handleTouchMove = (e) => {
+        e.preventDefault();
+        const rect = wrap.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = Math.max(0, Math.min(319, Math.floor((touch.clientX - rect.left) * (320 / rect.width))));
+        const y = Math.max(0, Math.min(239, Math.floor((touch.clientY - rect.top) * (240 / rect.height))));
+        
+        crosshairX = x;
+        crosshairY = y;
+        targetCrosshairX = x;
+        targetCrosshairY = y;
+        
+        notifyUserActivity();
+        updateCrosshairVisuals();
+        renderDevCanvas();
+    };
+
+    wrap.addEventListener("touchstart", handleTouchMove, { passive: false });
+    wrap.addEventListener("touchmove", handleTouchMove, { passive: false });
+}
+
+function notifyUserActivity() {
+    isUserMoving = true;
+    if (idleTimer) clearTimeout(idleTimer);
+    
+    idleTimer = setTimeout(() => {
+        isUserMoving = false;
+    }, 2000);
+}
 
 function toggleSpectrum() {
     document.getElementById("spectrum-drawer").classList.toggle("open");
@@ -684,17 +854,7 @@ async function toggleWebcamDrawer() {
     drawer.classList.toggle("open");
     webcamActive = drawer.classList.contains("open");
 
-    if (webcamActive && !uploadedImage) {
-        try {
-            devStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
-            const video = document.getElementById("dev-video");
-            video.srcObject = devStream;
-            video.play();
-            updateCrosshairVisuals();
-        } catch (err) {
-            console.error("Webcam Access Error:", err);
-        }
-    } else if (!webcamActive) {
+    if (!webcamActive) {
         stopWebcam();
         resetToBlack();
     }
@@ -737,6 +897,7 @@ function toggleRandomRoam() {
             if (!activeKeys.w && !activeKeys.a && !activeKeys.s && !activeKeys.d) {
                 targetCrosshairX = Math.floor(Math.random() * 320);
                 targetCrosshairY = Math.floor(Math.random() * 240);
+                notifyUserActivity();
             }
         }, 5000);
     } else {
@@ -744,7 +905,6 @@ function toggleRandomRoam() {
             clearInterval(randomRoamTimer);
             randomRoamTimer = null;
         }
-        // Lock targets to current position to stop rubber-banding
         targetCrosshairX = crosshairX;
         targetCrosshairY = crosshairY;
     }
@@ -753,13 +913,11 @@ function toggleRandomRoam() {
 function continuousUpdateLoop() {
     let moved = false;
 
-    // Manual Keyboard Controls (Sends hardware commands)
-    if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); targetCrosshairY = crosshairY; moved = true; send("W1"); }
-    if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); targetCrosshairY = crosshairY; moved = true; send("S1"); }
-    if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); targetCrosshairX = crosshairX; moved = true; send("A1"); }
-    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); targetCrosshairX = crosshairX; moved = true; send("D1"); }
+    if (activeKeys.w) { crosshairY = Math.max(0, crosshairY - STEP_SPEED); targetCrosshairY = crosshairY; moved = true; send("W1"); notifyUserActivity(); }
+    if (activeKeys.s) { crosshairY = Math.min(239, crosshairY + STEP_SPEED); targetCrosshairY = crosshairY; moved = true; send("S1"); notifyUserActivity(); }
+    if (activeKeys.a) { crosshairX = Math.max(0, crosshairX - STEP_SPEED); targetCrosshairX = crosshairX; moved = true; send("A1"); notifyUserActivity(); }
+    if (activeKeys.d) { crosshairX = Math.min(319, crosshairX + STEP_SPEED); moved = true; send("D1"); notifyUserActivity(); }
 
-    // Automated Visual Crosshair Roaming (Only when Roam Mode is ON)
     const isRoam = document.getElementById("random-roam-mode") ? document.getElementById("random-roam-mode").checked : false;
     
     if (!moved && isRoam && (crosshairX !== targetCrosshairX || crosshairY !== targetCrosshairY)) {
@@ -768,8 +926,8 @@ function continuousUpdateLoop() {
         if (crosshairY < targetCrosshairY) crosshairY = Math.min(targetCrosshairY, crosshairY + STEP_SPEED);
         if (crosshairY > targetCrosshairY) crosshairY = Math.max(targetCrosshairY, crosshairY - STEP_SPEED);
         moved = true;
+        notifyUserActivity();
     } else if (!isRoam) {
-        // Force target to lock to current coordinates when roam is OFF
         targetCrosshairX = crosshairX;
         targetCrosshairY = crosshairY;
     }
@@ -789,7 +947,7 @@ function renderDevCanvas() {
     if (uploadedImage) {
         ctx.drawImage(uploadedImage, 0, 0, 320, 240);
         sampleCanvasAt(Math.floor(crosshairX), Math.floor(crosshairY));
-    } else {
+    } else if (devStream) {
         const video = document.getElementById("dev-video");
         if (video.readyState === 4) {
             ctx.drawImage(video, 0, 0, 320, 240);
@@ -1091,10 +1249,12 @@ function startScaleSequencer() {
         if (!audioCtx || currentScaleNotes.length === 0 || activeEditKey) return;
 
         const isSingleTone = document.getElementById("single-tone-mode").checked;
+        const isIdlePentatonic = document.getElementById("idle-pentatonic-mode").checked;
         const isVaryMode = document.getElementById("vary-scale-repeat").checked;
         
         let noteName;
-        if (isSingleTone) {
+        
+        if (isSingleTone || (isIdlePentatonic && isUserMoving)) {
             noteName = currentScaleNotes[0];
         } else {
             noteName = currentScaleNotes[mainPos % currentScaleNotes.length];
@@ -1292,13 +1452,18 @@ async function connect() {
         encoder.readable.pipeTo(port.writable);
         writer = encoder.writable.getWriter();
 
-        document.getElementById("status").innerText = "STATUS: CONNECTED";
+        const statusStr = "USB CNC: CONNECTED";
+        document.getElementById("status").innerText = statusStr;
+        document.getElementById("mobile-status-text").innerText = statusStr;
         document.getElementById("connect-btn").style.display = "none";
+        document.getElementById("mobile-connect-btn").style.display = "none";
 
         listenToSerial();
 
     } catch (err) {
-        document.getElementById("status").innerText = "STATUS: FAILED";
+        const statusStr = "USB CNC: FAILED";
+        document.getElementById("status").innerText = statusStr;
+        document.getElementById("mobile-status-text").innerText = statusStr;
     }
 }
 
@@ -1327,6 +1492,7 @@ async function listenToSerial() {
 
                     document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
                     processCameraTone(r, g, b);
+                    notifyUserActivity();
                 }
             }
         }
@@ -1379,10 +1545,16 @@ document.addEventListener("keyup", async (e) => {
     btn.addEventListener("mousedown", async () => { activeKeys[id] = true; activate(id); await send(id.toUpperCase() + "1"); });
     btn.addEventListener("mouseup", async () => { activeKeys[id] = false; deactivate(id); await send(id.toUpperCase() + "0"); });
     btn.addEventListener("mouseleave", async () => { activeKeys[id] = false; deactivate(id); await send(id.toUpperCase() + "0"); });
+    btn.addEventListener("touchstart", async (e) => { e.preventDefault(); activeKeys[id] = true; activate(id); await send(id.toUpperCase() + "1"); });
+    btn.addEventListener("touchend", async (e) => { e.preventDefault(); activeKeys[id] = false; deactivate(id); await send(id.toUpperCase() + "0"); });
 });
 
+window.addEventListener("resize", checkMobileLayout);
+
+checkMobileLayout();
 buildMatrixUI();
 updateScaleLabels();
+setupTouchDraggableCanvas();
 requestAnimationFrame(continuousUpdateLoop);
 </script>
 
